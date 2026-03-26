@@ -56,6 +56,7 @@ class Player {
   int totalFishCaught;        // 总共钓到的鱼数量
   int totalBossDefeated;      // 击败Boss总数
   PrestigeData prestige;      // 转生数据
+  Map<String, dynamic>? achievementProgress; // 成就进度
 
   Player({
     this.coins = 0,
@@ -67,6 +68,7 @@ class Player {
     this.totalFishCaught = 0,
     this.totalBossDefeated = 0,
     PrestigeData? prestige,
+    this.achievementProgress,
   })  : ownedFish = ownedFish ?? [],
         equipment = equipment ?? FishingEquipment(),
         inventory = inventory ?? [],
@@ -110,6 +112,7 @@ class Player {
     'totalFishCaught': totalFishCaught,
     'totalBossDefeated': totalBossDefeated,
     'prestige': prestige.toJson(),
+    'achievementProgress': achievementProgress,
   };
 
   factory Player.fromJson(Map<String, dynamic> json) => Player(
@@ -132,5 +135,6 @@ class Player {
     prestige: json['prestige'] != null
         ? PrestigeData.fromJson(json['prestige'])
         : const PrestigeData(),
+    achievementProgress: json['achievementProgress'],
   );
 }

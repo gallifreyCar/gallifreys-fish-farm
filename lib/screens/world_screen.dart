@@ -499,6 +499,13 @@ class _WorldScreenState extends ConsumerState<WorldScreen>
       ref.read(goalProvider.notifier).addProgress('defeat_boss_1', 1);
       ref.read(goalProvider.notifier).addProgress('defeat_boss_5', 1);
       ref.read(goalProvider.notifier).addProgress('defeat_boss_10', 1);
+
+      // 更新战斗成就
+      ref.read(game.gameProvider.notifier).updateBattleAchievements(
+        (ref.read(game.gameProvider).player.totalBossDefeated) + 1,
+        _lastCombo,
+        battleState.battleFish.where((bf) => bf.isAlive).length,
+      );
     }
 
     return Scaffold(
@@ -1194,7 +1201,7 @@ class _FishCard extends StatelessWidget {
 }
 
 /// 欢迎引导弹窗
-class _WelcomeDialog extends StatelessWidget {
+class _WelcomeDialog extends StatefulWidget {
   final VoidCallback onStart;
   final VoidCallback onSkip;
 
@@ -1204,100 +1211,138 @@ class _WelcomeDialog extends StatelessWidget {
   });
 
   @override
+  State<_WelcomeDialog> createState() => _WelcomeDialogState();
+}
+
+class _WelcomeDialogState extends State<_WelcomeDialog>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _fadeAnimation;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    );
+    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.elasticOut),
+    );
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Colors.blue[900]!, Colors.blue[700]!],
-          ),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.blue.withAlpha(100),
-              blurRadius: 20,
-              spreadRadius: 5,
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // 标题动画
-            const Text(
-              '🎣',
-              style: TextStyle(fontSize: 64),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              '欢迎来到钓鱼农场',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: ScaleTransition(
+        scale: _scaleAnimation,
+        child: Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Colors.blue[900]!, Colors.blue[700]!],
               ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              '加利弗雷鱼农场',
-              style: TextStyle(
-                color: Colors.blue[200],
-                fontSize: 16,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white.withAlpha(20),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                children: [
-                  _FeatureItem(icon: '🐟', text: '钓取各种稀有鱼宠'),
-                  _FeatureItem(icon: '⚔️', text: '挑战强大的Boss'),
-                  _FeatureItem(icon: '🏗️', text: '建造升级建筑'),
-                  _FeatureItem(icon: '🏆', text: '解锁成就奖励'),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: onSkip,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white70,
-                      side: const BorderSide(color: Colors.white30),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                    child: const Text('跳过引导'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  flex: 2,
-                  child: ElevatedButton(
-                    onPressed: onStart,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: const Text('开始冒险!', style: TextStyle(fontSize: 16)),
-                  ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.blue.withAlpha(100),
+                  blurRadius: 20,
+                  spreadRadius: 5,
                 ),
               ],
             ),
-          ],
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 标题动画
+                const Text(
+                  '🎣',
+                  style: TextStyle(fontSize: 64),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  '欢迎来到钓鱼农场',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  '加利弗雷鱼农场',
+                  style: TextStyle(
+                    color: Colors.blue[200],
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withAlpha(20),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    children: [
+                      _FeatureItem(icon: '🐟', text: '钓取各种稀有鱼宠'),
+                      _FeatureItem(icon: '⚔️', text: '挑战强大的Boss'),
+                      _FeatureItem(icon: '🏗️', text: '建造升级建筑'),
+                      _FeatureItem(icon: '🏆', text: '解锁成就奖励'),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: widget.onSkip,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white70,
+                          side: const BorderSide(color: Colors.white30),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        child: const Text('跳过引导'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton(
+                        onPressed: widget.onStart,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text('开始冒险!', style: TextStyle(fontSize: 16)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

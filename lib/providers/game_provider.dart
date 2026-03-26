@@ -34,9 +34,25 @@ class GameState {
     Map<String, AchievementProgress>? achievementProgress,
     DailyQuestData? dailyQuests,
     EventData? eventData,
-  }) : achievementProgress = achievementProgress ?? _initAchievements(),
+  }) : achievementProgress = achievementProgress ?? _initAchievementsFromPlayer(player),
        dailyQuests = dailyQuests ?? DailyQuestData.generate(DateTime.now()),
        eventData = eventData ?? EventData();
+
+  /// 从 Player 加载成就进度，如果没有则初始化
+  static Map<String, AchievementProgress> _initAchievementsFromPlayer(Player player) {
+    if (player.achievementProgress != null) {
+      // 从存档加载
+      final saved = player.achievementProgress!;
+      return {
+        for (final a in Achievement.allAchievements)
+          a.id: saved[a.id] != null
+              ? AchievementProgress.fromJson(saved[a.id] as Map<String, dynamic>)
+              : AchievementProgress(achievementId: a.id)
+      };
+    }
+    // 新游戏初始化
+    return _initAchievements();
+  }
 
   /// 初始化成就进度
   static Map<String, AchievementProgress> _initAchievements() {
@@ -182,10 +198,14 @@ class GameNotifier extends StateNotifier<GameState> {
     // 更新成就进度
     final newProgress = Map<String, AchievementProgress>.from(state.achievementProgress);
 
-    // 钓鱼成就
-    _updateAchievementProgress(newProgress, 'first_catch', newPlayer.totalFishCaught);
-    _updateAchievementProgress(newProgress, 'fisherman_100', newPlayer.totalFishCaught);
-    _updateAchievementProgress(newProgress, 'fisherman_1000', newPlayer.totalFishCaught);
+    // 钓鱼成就（ID 与 achievement.dart 定义一致）
+    _updateAchievementProgress(newProgress, 'catch_1', newPlayer.totalFishCaught);
+    _updateAchievementProgress(newProgress, 'catch_10', newPlayer.totalFishCaught);
+    _updateAchievementProgress(newProgress, 'catch_50', newPlayer.totalFishCaught);
+    _updateAchievementProgress(newProgress, 'catch_100', newPlayer.totalFishCaught);
+    _updateAchievementProgress(newProgress, 'catch_500', newPlayer.totalFishCaught);
+    _updateAchievementProgress(newProgress, 'catch_1000', newPlayer.totalFishCaught);
+    _updateAchievementProgress(newProgress, 'catch_5000', newPlayer.totalFishCaught);
 
     // 收集成就
     _updateCollectionAchievements(newProgress, newPlayer.ownedFish);
@@ -217,7 +237,9 @@ class GameNotifier extends StateNotifier<GameState> {
   /// 更新收集类成就
   void _updateCollectionAchievements(Map<String, AchievementProgress> progress, List<Fish> fish) {
     // 拥有鱼数量
-    _updateAchievementProgress(progress, 'collector_10', fish.length);
+    _updateAchievementProgress(progress, 'fish_10', fish.length);
+    _updateAchievementProgress(progress, 'fish_50', fish.length);
+    _updateAchievementProgress(progress, 'fish_100', fish.length);
 
     // 稀有及以上数量
     final rareOrBetter = fish.where((f) =>
@@ -225,11 +247,44 @@ class GameNotifier extends StateNotifier<GameState> {
       f.rarity == Rarity.epic ||
       f.rarity == Rarity.legendary
     ).length;
-    _updateAchievementProgress(progress, 'rare_collector', rareOrBetter);
+    _updateAchievementProgress(progress, 'rare_5', rareOrBetter);
+    _updateAchievementProgress(progress, 'rare_20', rareOrBetter);
+
+    // 史诗数量
+    final epic = fish.where((f) => f.rarity == Rarity.epic).length;
+    _updateAchievementProgress(progress, 'epic_5', epic);
+    _updateAchievementProgress(progress, 'epic_10', epic);
 
     // 传说数量
     final legendary = fish.where((f) => f.rarity == Rarity.legendary).length;
-    _updateAchievementProgress(progress, 'legendary_collector', legendary);
+    _updateAchievementProgress(progress, 'legendary_1', legendary);
+    _updateAchievementProgress(progress, 'legendary_5', legendary);
+    _updateAchievementProgress(progress, 'legendary_all', legendary);
+  }
+
+  /// 更新经济类成就
+  void _updateEconomyAchievements(Map<String, AchievementProgress> progress, int coins, int incomePerSecond) {
+    _updateAchievementProgress(progress, 'coins_1000', coins);
+    _updateAchievementProgress(progress, 'coins_10000', coins);
+    _updateAchievementProgress(progress, 'coins_100000', coins);
+    _updateAchievementProgress(progress, 'coins_1000000', coins);
+    _updateAchievementProgress(progress, 'income_10', incomePerSecond);
+    _updateAchievementProgress(progress, 'income_100', incomePerSecond);
+    _updateAchievementProgress(progress, 'income_1000', incomePerSecond);
+  }
+
+  /// 更新战斗类成就（公开方法）
+  void updateBattleAchievements(int bossDefeated, int combo, int fishCount) {
+    final newProgress = Map<String, AchievementProgress>.from(state.achievementProgress);
+    _updateAchievementProgress(newProgress, 'defeat_boss_1', bossDefeated);
+    _updateAchievementProgress(newProgress, 'defeat_boss_5', bossDefeated);
+    _updateAchievementProgress(newProgress, 'defeat_boss_10', bossDefeated);
+    _updateAchievementProgress(newProgress, 'combo_50', combo);
+    _updateAchievementProgress(newProgress, 'combo_100', combo);
+    if (fishCount == 1) {
+      _updateAchievementProgress(newProgress, 'boss_solo', 1);
+    }
+    state = state.copyWith(achievementProgress: newProgress);
   }
 
   /// 领取成就奖励
@@ -435,9 +490,14 @@ class GameNotifier extends StateNotifier<GameState> {
   void sellFish(String fishId) {
     final price = state.player.sellFish(fishId);
     if (price > 0) {
+      // 更新经济成就
+      final newProgress = Map<String, AchievementProgress>.from(state.achievementProgress);
+      _updateEconomyAchievements(newProgress, state.player.coins, state.player.incomePerSecond);
+
       state = state.copyWith(
         player: state.player,
         notification: '出售成功！获得 $price 金币',
+        achievementProgress: newProgress,
       );
     }
   }
@@ -489,6 +549,11 @@ class GameNotifier extends StateNotifier<GameState> {
   /// 自动保存
   void _autoSave() {
     state.player.lastSaveTime = DateTime.now();
+    // 保存成就进度到 Player
+    state.player.achievementProgress = {
+      for (final entry in state.achievementProgress.entries)
+        entry.key: entry.value.toJson()
+    };
     onSave?.call(state.player.toJson());
   }
 
