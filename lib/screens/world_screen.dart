@@ -12,6 +12,7 @@ import '../services/goal_service.dart';
 import '../widgets/world_renderer.dart';
 import '../widgets/battle_arena.dart';
 import '../widgets/goal_panel.dart';
+import 'achievement_screen.dart';
 
 /// 主游戏场景
 class WorldScreen extends ConsumerStatefulWidget {
@@ -44,6 +45,33 @@ class _WorldScreenState extends ConsumerState<WorldScreen>
       ref.read(worldProvider.notifier).update(0.033);
       _updateGoalProgress();
     });
+
+    // 显示欢迎引导弹窗
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _showWelcomeDialogIfNeeded();
+    });
+  }
+
+  /// 显示欢迎引导弹窗
+  void _showWelcomeDialogIfNeeded() {
+    final tutorialState = ref.read(tutorialProvider);
+    if (tutorialState.currentStep == TutorialStep.welcome && !tutorialState.hasSeenWelcome) {
+      ref.read(tutorialProvider.notifier).markWelcomeSeen();
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => _WelcomeDialog(
+          onStart: () {
+            Navigator.pop(context);
+            ref.read(tutorialProvider.notifier).completeStep();
+          },
+          onSkip: () {
+            Navigator.pop(context);
+            ref.read(tutorialProvider.notifier).skipTutorial();
+          },
+        ),
+      );
+    }
   }
 
   @override
@@ -285,6 +313,7 @@ class _WorldScreenState extends ConsumerState<WorldScreen>
   }
 
   Widget _buildBottomBar(game.GameState gameState) {
+    final claimableAchievements = gameState.claimableAchievements;
 
     return SafeArea(
       child: Container(
@@ -330,6 +359,18 @@ class _WorldScreenState extends ConsumerState<WorldScreen>
               onTap: () {
                 _showCollectionPanel(gameState);
                 _checkTutorialStep(TutorialStep.viewCollection);
+              },
+            ),
+            _ActionButton(
+              icon: '🏆',
+              label: '成就',
+              featureId: 'achievements',
+              badge: claimableAchievements > 0 ? claimableAchievements : null,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const AchievementScreen()),
+                );
               },
             ),
           ],
@@ -924,12 +965,14 @@ class _ActionButton extends StatelessWidget {
   final String label;
   final String featureId;
   final VoidCallback onTap;
+  final int? badge;
 
   const _ActionButton({
     required this.icon,
     required this.label,
     required this.featureId,
     required this.onTap,
+    this.badge,
   });
 
   @override
@@ -945,18 +988,43 @@ class _ActionButton extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withAlpha(30),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Center(
-                    child: isUnlocked
-                        ? Text(icon, style: const TextStyle(fontSize: 24))
-                        : const Icon(Icons.lock, color: Colors.grey, size: 20),
-                  ),
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withAlpha(30),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Center(
+                        child: isUnlocked
+                            ? Text(icon, style: const TextStyle(fontSize: 24))
+                            : const Icon(Icons.lock, color: Colors.grey, size: 20),
+                      ),
+                    ),
+                    if (badge != null && badge! > 0)
+                      Positioned(
+                        right: -4,
+                        top: -4,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.orange,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '$badge',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -1120,6 +1188,147 @@ class _FishCard extends StatelessWidget {
             color: _getRarityColor(),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// 欢迎引导弹窗
+class _WelcomeDialog extends StatelessWidget {
+  final VoidCallback onStart;
+  final VoidCallback onSkip;
+
+  const _WelcomeDialog({
+    required this.onStart,
+    required this.onSkip,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Colors.blue[900]!, Colors.blue[700]!],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.blue.withAlpha(100),
+              blurRadius: 20,
+              spreadRadius: 5,
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 标题动画
+            const Text(
+              '🎣',
+              style: TextStyle(fontSize: 64),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              '欢迎来到钓鱼农场',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '加利弗雷鱼农场',
+              style: TextStyle(
+                color: Colors.blue[200],
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white.withAlpha(20),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  _FeatureItem(icon: '🐟', text: '钓取各种稀有鱼宠'),
+                  _FeatureItem(icon: '⚔️', text: '挑战强大的Boss'),
+                  _FeatureItem(icon: '🏗️', text: '建造升级建筑'),
+                  _FeatureItem(icon: '🏆', text: '解锁成就奖励'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: onSkip,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white70,
+                      side: const BorderSide(color: Colors.white30),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    child: const Text('跳过引导'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton(
+                    onPressed: onStart,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text('开始冒险!', style: TextStyle(fontSize: 16)),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FeatureItem extends StatelessWidget {
+  final String icon;
+  final String text;
+
+  const _FeatureItem({
+    required this.icon,
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Text(icon, style: const TextStyle(fontSize: 20)),
+          const SizedBox(width: 12),
+          Text(
+            text,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+            ),
+          ),
+        ],
       ),
     );
   }
