@@ -42,8 +42,52 @@ class WorldPainter extends CustomPainter {
     required this.time,
   });
 
+  // ========== 静态 Paint 缓存 - 避免每帧创建 ==========
+  static final Paint _skyPaint = Paint()..color = const Color(0xFF87CEEB);
+  static final Paint _grassPaint = Paint()..color = const Color(0xFF4CAF50);
+  static final Paint _waterPaint = Paint()..color = const Color(0xFF2196F3).withAlpha(180);
+  static final Paint _wavePaint = Paint()
+    ..color = Colors.white.withAlpha(30)
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 2;
+  static final Paint _shadowPaint = Paint()..color = Colors.black.withAlpha(30);
+  static final Paint _buildingBorderPaint = Paint()
+    ..color = Colors.brown
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 2;
+  static final Paint _lockedBuildingPaint = Paint()..color = Colors.grey.withAlpha(100);
+
+  // ========== 静态 TextPainter 缓存 ==========
+  static TextPainter? _zoneLabelSea;
+  static TextPainter? _zoneLabelVillage;
+  static TextPainter? _zoneLabelMountain;
+
+  static void _initZoneLabels() {
+    _zoneLabelSea ??= _createZoneLabel('🌊 海边');
+    _zoneLabelVillage ??= _createZoneLabel('🏠 鱼村');
+    _zoneLabelMountain ??= _createZoneLabel('🏔️ 探险区');
+  }
+
+  static TextPainter _createZoneLabel(String text) {
+    return TextPainter(
+      text: TextSpan(
+        text: text,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 14,
+          fontWeight: FontWeight.bold,
+          shadows: [Shadow(color: Colors.black54, blurRadius: 2)],
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
+    // 初始化区域标签
+    _initZoneLabels();
+
     // 绘制背景（草地+水）
     _drawBackground(canvas, size);
 
@@ -65,24 +109,16 @@ class WorldPainter extends CustomPainter {
   }
 
   void _drawBackground(Canvas canvas, Size size) {
-    // 天空
-    final skyPaint = Paint()..color = const Color(0xFF87CEEB);
-    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, 150), skyPaint);
+    // 天空 - 使用缓存
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, 150), _skyPaint);
 
-    // 草地
-    final grassPaint = Paint()..color = const Color(0xFF4CAF50);
-    canvas.drawRect(Rect.fromLTWH(0, 150, size.width, size.height - 150), grassPaint);
+    // 草地 - 使用缓存
+    canvas.drawRect(Rect.fromLTWH(0, 150, size.width, size.height - 150), _grassPaint);
 
-    // 海洋区域（左侧）
-    final waterPaint = Paint()..color = const Color(0xFF2196F3).withAlpha(180);
-    canvas.drawRect(Rect.fromLTWH(0, 150, 150, size.height - 150), waterPaint);
+    // 海洋区域（左侧）- 使用缓存
+    canvas.drawRect(Rect.fromLTWH(0, 150, 150, size.height - 150), _waterPaint);
 
-    // 添加水波纹效果
-    final wavePaint = Paint()
-      ..color = Colors.white.withAlpha(30)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
-
+    // 添加水波纹效果 - 使用缓存的 Paint
     for (int i = 0; i < 3; i++) {
       final waveY = 200.0 + i * 80 + sin(time * 2 + i) * 5;
       final path = Path();
@@ -90,60 +126,20 @@ class WorldPainter extends CustomPainter {
       for (double x = 0; x < 150; x += 5) {
         path.lineTo(x, waveY + sin(x * 0.05 + time * 3 + i) * 3);
       }
-      canvas.drawPath(path, wavePaint);
+      canvas.drawPath(path, _wavePaint);
     }
   }
 
   void _drawZones(Canvas canvas, Size size) {
-    // 区域标签
-    final textPainter = TextPainter(
-      textDirection: TextDirection.ltr,
-    );
-
-    // 海边区域标签
-    textPainter.text = const TextSpan(
-      text: '🌊 海边',
-      style: TextStyle(
-        color: Colors.white,
-        fontSize: 14,
-        fontWeight: FontWeight.bold,
-        shadows: [Shadow(color: Colors.black54, blurRadius: 2)],
-      ),
-    );
-    textPainter.layout();
-    textPainter.paint(canvas, const Offset(10, 155));
-
-    // 村庄区域标签
-    textPainter.text = const TextSpan(
-      text: '🏠 鱼村',
-      style: TextStyle(
-        color: Colors.white,
-        fontSize: 14,
-        fontWeight: FontWeight.bold,
-        shadows: [Shadow(color: Colors.black54, blurRadius: 2)],
-      ),
-    );
-    textPainter.layout();
-    textPainter.paint(canvas, const Offset(180, 155));
-
-    // 山区区域标签
-    textPainter.text = const TextSpan(
-      text: '🏔️ 探险区',
-      style: TextStyle(
-        color: Colors.white,
-        fontSize: 14,
-        fontWeight: FontWeight.bold,
-        shadows: [Shadow(color: Colors.black54, blurRadius: 2)],
-      ),
-    );
-    textPainter.layout();
-    textPainter.paint(canvas, const Offset(340, 155));
+    // 使用缓存的 TextPainter
+    _zoneLabelSea!.paint(canvas, const Offset(10, 155));
+    _zoneLabelVillage!.paint(canvas, const Offset(180, 155));
+    _zoneLabelMountain!.paint(canvas, const Offset(340, 155));
   }
 
   void _drawBuilding(Canvas canvas, Building building) {
     if (!building.isUnlocked) {
-      // 未解锁的建筑显示为阴影
-      final shadowPaint = Paint()..color = Colors.grey.withAlpha(100);
+      // 未解锁的建筑显示为阴影 - 使用缓存 Paint
       canvas.drawRect(
         Rect.fromLTWH(
           building.posX.toDouble(),
@@ -151,14 +147,14 @@ class WorldPainter extends CustomPainter {
           building.size.$1 * 40.0,
           building.size.$2 * 40.0,
         ),
-        shadowPaint,
+        _lockedBuildingPaint,
       );
 
-      // 绁锁图标
+      // 锁图标
       final textPainter = TextPainter(
         text: const TextSpan(
           text: '🔒',
-          style: TextStyle(fontSize: 24),
+          style: const TextStyle(fontSize: 24),
         ),
         textDirection: TextDirection.ltr,
       )..layout();
@@ -173,8 +169,7 @@ class WorldPainter extends CustomPainter {
     }
 
     // 建筑背景
-    final bgPaint = Paint()
-      ..color = _getBuildingColor(building.type);
+    final bgPaint = Paint()..color = _getBuildingColor(building.type);
     canvas.drawRect(
       Rect.fromLTWH(
         building.posX.toDouble(),
@@ -185,11 +180,7 @@ class WorldPainter extends CustomPainter {
       bgPaint,
     );
 
-    // 建筑边框
-    final borderPaint = Paint()
-      ..color = Colors.brown
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
+    // 建筑边框 - 使用缓存 Paint
     canvas.drawRect(
       Rect.fromLTWH(
         building.posX.toDouble(),
@@ -197,7 +188,7 @@ class WorldPainter extends CustomPainter {
         building.size.$1 * 40.0,
         building.size.$2 * 40.0,
       ),
-      borderPaint,
+      _buildingBorderPaint,
     );
 
     // 建筑图标
@@ -253,15 +244,14 @@ class WorldPainter extends CustomPainter {
   }
 
   void _drawFish(Canvas canvas, WorldFish wf) {
-    // 鱼的阴影
-    final shadowPaint = Paint()..color = Colors.black.withAlpha(30);
+    // 鱼的阴影 - 使用缓存 Paint
     canvas.drawOval(
       Rect.fromCenter(
         center: Offset(wf.x, wf.y + 15),
         width: 20,
         height: 8,
       ),
-      shadowPaint,
+      _shadowPaint,
     );
 
     // 根据状态调整动画
