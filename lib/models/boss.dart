@@ -1,10 +1,18 @@
 import 'fish.dart';
 
+/// Boss 难度层级
+enum BossTier {
+  easy,    // 初级
+  medium,  // 中级
+  hard,    // 高级
+}
+
 /// Boss数据模型
 class Boss {
   final String id;
   final String name;
   final String emoji;
+  final BossTier tier;
   final int maxHp;
   final int attack;
   final int defense;
@@ -20,6 +28,7 @@ class Boss {
     required this.id,
     required this.name,
     required this.emoji,
+    this.tier = BossTier.easy,
     required this.maxHp,
     required this.attack,
     required this.defense,
@@ -52,6 +61,7 @@ class Boss {
     'id': id,
     'name': name,
     'emoji': emoji,
+    'tier': tier.index,
     'maxHp': maxHp,
     'attack': attack,
     'defense': defense,
@@ -66,6 +76,7 @@ class Boss {
     id: json['id'],
     name: json['name'],
     emoji: json['emoji'],
+    tier: BossTier.values[json['tier'] ?? 0],
     maxHp: json['maxHp'],
     attack: json['attack'],
     defense: json['defense'],
@@ -78,12 +89,14 @@ class Boss {
     isDefeated: json['isDefeated'] ?? false,
   );
 
-  /// 预设Boss列表
+  /// 预设Boss列表 - 12个Boss
   static List<Boss> get defaultBosses => [
+    // ========== Tier 1: 初级 Boss (推荐战力 100-500) ==========
     Boss(
       id: 'crab_general',
       name: '螃蟹将军',
       emoji: '🦀',
+      tier: BossTier.easy,
       maxHp: 500,
       attack: 20,
       defense: 5,
@@ -95,9 +108,54 @@ class Boss {
       ],
     ),
     Boss(
+      id: 'shrimp_commander',
+      name: '虾兵统领',
+      emoji: '🦐',
+      tier: BossTier.easy,
+      maxHp: 800,
+      attack: 25,
+      defense: 8,
+      requiredPower: 200,
+      rewards: [
+        BossReward(type: RewardType.coins, amount: 200),
+        BossReward(type: RewardType.materials, amount: 10),
+      ],
+    ),
+    Boss(
+      id: 'shell_guardian',
+      name: '贝壳守卫',
+      emoji: '🐚',
+      tier: BossTier.easy,
+      maxHp: 1200,
+      attack: 30,
+      defense: 15,
+      requiredPower: 350,
+      rewards: [
+        BossReward(type: RewardType.coins, amount: 300),
+        BossReward(type: RewardType.fishRarity, rarity: Rarity.rare, amount: 2),
+      ],
+    ),
+    Boss(
+      id: 'pufferfish_captain',
+      name: '河豚队长',
+      emoji: '🐡',
+      tier: BossTier.easy,
+      maxHp: 1800,
+      attack: 40,
+      defense: 10,
+      requiredPower: 500,
+      rewards: [
+        BossReward(type: RewardType.coins, amount: 400),
+        BossReward(type: RewardType.materials, amount: 20),
+      ],
+    ),
+
+    // ========== Tier 2: 中级 Boss (推荐战力 500-2000) ==========
+    Boss(
       id: 'shark_pirate',
       name: '鲨鱼海盗',
       emoji: '🦈',
+      tier: BossTier.medium,
       maxHp: 2000,
       attack: 50,
       defense: 15,
@@ -112,32 +170,115 @@ class Boss {
       id: 'octopus_demon',
       name: '章鱼魔王',
       emoji: '🐙',
+      tier: BossTier.medium,
+      maxHp: 5000,
+      attack: 70,
+      defense: 25,
+      requiredPower: 1000,
+      rewards: [
+        BossReward(type: RewardType.coins, amount: 1500),
+        BossReward(type: RewardType.materials, amount: 30),
+        BossReward(type: RewardType.fishRarity, rarity: Rarity.epic, amount: 1),
+      ],
+    ),
+    Boss(
+      id: 'whale_lord',
+      name: '鲸鱼领主',
+      emoji: '🐋',
+      tier: BossTier.medium,
       maxHp: 8000,
       attack: 100,
       defense: 30,
       requiredPower: 1500,
       rewards: [
         BossReward(type: RewardType.coins, amount: 2000),
-        BossReward(type: RewardType.materials, amount: 30),
+        BossReward(type: RewardType.materials, amount: 50),
         BossReward(type: RewardType.fishRarity, rarity: Rarity.epic, amount: 1),
+      ],
+    ),
+    Boss(
+      id: 'ancient_turtle',
+      name: '千年龟仙',
+      emoji: '🐢',
+      tier: BossTier.medium,
+      maxHp: 10000,
+      attack: 60,
+      defense: 50,
+      requiredPower: 2000,
+      rewards: [
+        BossReward(type: RewardType.coins, amount: 2500),
+        BossReward(type: RewardType.fishRarity, rarity: Rarity.epic, amount: 2),
+      ],
+    ),
+
+    // ========== Tier 3: 高级 Boss (推荐战力 2000+) ==========
+    Boss(
+      id: 'deep_sea_overlord',
+      name: '深海霸主',
+      emoji: '🦑',
+      tier: BossTier.hard,
+      maxHp: 20000,
+      attack: 150,
+      defense: 40,
+      requiredPower: 3000,
+      rewards: [
+        BossReward(type: RewardType.coins, amount: 5000),
+        BossReward(type: RewardType.fishRarity, rarity: Rarity.legendary, amount: 1),
+      ],
+    ),
+    Boss(
+      id: 'inferno_squid',
+      name: '炼狱乌贼',
+      emoji: '🔥',
+      tier: BossTier.hard,
+      maxHp: 30000,
+      attack: 180,
+      defense: 35,
+      requiredPower: 4000,
+      rewards: [
+        BossReward(type: RewardType.coins, amount: 8000),
+        BossReward(type: RewardType.artifact, amount: 1),
+        BossReward(type: RewardType.fishRarity, rarity: Rarity.legendary, amount: 1),
+      ],
+    ),
+    Boss(
+      id: 'siren_queen',
+      name: '海妖女王',
+      emoji: '🧜‍♀️',
+      tier: BossTier.hard,
+      maxHp: 40000,
+      attack: 200,
+      defense: 50,
+      requiredPower: 5000,
+      rewards: [
+        BossReward(type: RewardType.coins, amount: 10000),
+        BossReward(type: RewardType.fishRarity, rarity: Rarity.legendary, amount: 1),
       ],
     ),
     Boss(
       id: 'dragon_king',
       name: '海龙王',
       emoji: '🐉',
-      maxHp: 30000,
-      attack: 200,
-      defense: 50,
-      requiredPower: 5000,
+      tier: BossTier.hard,
+      maxHp: 50000,
+      attack: 250,
+      defense: 60,
+      requiredPower: 8000,
       rewards: [
-        BossReward(type: RewardType.coins, amount: 10000),
-        BossReward(type: RewardType.materials, amount: 100),
+        BossReward(type: RewardType.coins, amount: 20000),
         BossReward(type: RewardType.fishRarity, rarity: Rarity.legendary, amount: 1),
         BossReward(type: RewardType.artifact, amount: 1),
       ],
     ),
   ];
+
+  /// 获取指定难度的Boss
+  static List<Boss> getBossesByTier(BossTier tier) {
+    return defaultBosses.where((b) => b.tier == tier).toList();
+  }
+
+  /// Boss总数
+  static int get totalBossCount => defaultBosses.length;
 }
 
 /// 奖励类型
