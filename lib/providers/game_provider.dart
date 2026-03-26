@@ -1,9 +1,13 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/fish.dart';
 import '../models/player.dart';
 import '../models/achievement.dart';
 import '../models/daily_quest.dart';
+import '../models/equipment.dart';
+import '../models/prestige.dart';
+import '../models/game_event.dart';
 import '../utils/fish_data.dart';
 import '../utils/constants.dart';
 
@@ -15,10 +19,12 @@ class GameState {
   final String? notification;
   final Map<String, AchievementProgress> achievementProgress;
   final DailyQuestData dailyQuests;
+  final EventData eventData;
 
   // 缓存计算结果，避免重复计算
   int? _cachedIncomePerSecond;
   int? _cachedTotalPower;
+  List<GameEvent>? _cachedActiveEvents;
 
   GameState({
     required this.player,
@@ -27,8 +33,10 @@ class GameState {
     this.notification,
     Map<String, AchievementProgress>? achievementProgress,
     DailyQuestData? dailyQuests,
+    EventData? eventData,
   }) : achievementProgress = achievementProgress ?? _initAchievements(),
-       dailyQuests = dailyQuests ?? DailyQuestData.generate(DateTime.now());
+       dailyQuests = dailyQuests ?? DailyQuestData.generate(DateTime.now()),
+       eventData = eventData ?? EventData();
 
   /// 初始化成就进度
   static Map<String, AchievementProgress> _initAchievements() {
@@ -65,6 +73,26 @@ class GameState {
     return dailyQuests.claimableCount;
   }
 
+  /// 获取当前活跃的活动
+  List<GameEvent> get activeEvents {
+    return _cachedActiveEvents ??= EventManager.getActiveEvents(eventData.customEvents);
+  }
+
+  /// 获取活动收入加成
+  double get eventIncomeMultiplier {
+    return EventManager.getIncomeMultiplier(activeEvents);
+  }
+
+  /// 获取活动经验加成
+  double get eventExpMultiplier {
+    return EventManager.getExpMultiplier(activeEvents);
+  }
+
+  /// 获取Boss奖励加成
+  double get eventBossRewardMultiplier {
+    return EventManager.getBossRewardMultiplier(activeEvents);
+  }
+
   GameState copyWith({
     Player? player,
     bool? isFishing,
@@ -72,6 +100,7 @@ class GameState {
     String? notification,
     Map<String, AchievementProgress>? achievementProgress,
     DailyQuestData? dailyQuests,
+    EventData? eventData,
     bool clearNotification = false,
     bool clearLastCaughtFish = false,
   }) {
@@ -82,6 +111,7 @@ class GameState {
       notification: clearNotification ? null : (notification ?? this.notification),
       achievementProgress: achievementProgress ?? this.achievementProgress,
       dailyQuests: dailyQuests ?? this.dailyQuests,
+      eventData: eventData ?? this.eventData,
     );
   }
 }
@@ -486,6 +516,278 @@ class GameNotifier extends StateNotifier<GameState> {
     }
   }
 
+  // ==================== 装备系统 ====================
+
+  static final Random _random = Random();
+
+  /// 生成装备掉落（战斗胜利后调用）
+  Equipment? generateEquipmentDrop(int bossLevel) {
+    // 根据Boss等级决定掉落概率
+    final dropChance = 0.3 + (bossLevel * 0.05); // 基础30%，每级+5%
+    if (_random.nextDouble() > dropChance) return null;
+
+    // 根据Boss等级决定装备稀有度
+    EquipmentRarity rarity;
+    final roll = _random.nextDouble();
+    if (bossLevel >= 4 && roll < 0.1) {
+      rarity = EquipmentRarity.legendary;
+    } else if (bossLevel >= 3 && roll < 0.25) {
+      rarity = EquipmentRarity.epic;
+    } else if (bossLevel >= 2 && roll < 0.5) {
+      rarity = EquipmentRarity.rare;
+    } else {
+      rarity = EquipmentRarity.common;
+    }
+
+    final template = EquipmentTemplate.getRandomTemplate(rarity);
+    return template.create();
+  }
+
+  /// 添加装备到背包
+  void addEquipmentToInventory(Equipment equipment) {
+    state.player.inventory.add(equipment);
+    state = state.copyWith(
+      player: state.player,
+      notification: '🎁 获得装备 ${equipment.emoji} ${equipment.name}！',
+    );
+  }
+
+  /// 给鱼装备道具
+  bool equipItem(String fishId, String equipmentId) {
+    final fish = state.player.ownedFish.firstWhere(
+      (f) => f.id == fishId,
+      orElse: () => throw Exception('鱼不存在'),
+    );
+
+    final equipment = state.player.inventory.firstWhere(
+      (e) => e.id == equipmentId,
+      orElse: () => throw Exception('装备不存在'),
+    );
+
+    // 检查槽位是否匹配
+    Equipment? oldEquipment;
+    switch (equipment.slot) {
+      case EquipmentSlot.weapon:
+        oldEquipment = fish.weapon;
+        fish.equipWeapon(equipment);
+        break;
+      case EquipmentSlot.armor:
+        oldEquipment = fish.armor;
+        fish.equipArmor(equipment);
+        break;
+      case EquipmentSlot.accessory:
+        oldEquipment = fish.accessory;
+        fish.equipAccessory(equipment);
+        break;
+    }
+
+    // 从背包移除新装备
+    state.player.inventory.removeWhere((e) => e.id == equipmentId);
+
+    // 如果有旧装备，放回背包
+    if (oldEquipment != null) {
+      state.player.inventory.add(oldEquipment);
+    }
+
+    state = state.copyWith(player: state.player);
+    return true;
+  }
+
+  /// 卸下装备
+  bool unequipItem(String fishId, EquipmentSlot slot) {
+    final fish = state.player.ownedFish.firstWhere(
+      (f) => f.id == fishId,
+      orElse: () => throw Exception('鱼不存在'),
+    );
+
+    Equipment? equipment;
+    switch (slot) {
+      case EquipmentSlot.weapon:
+        equipment = fish.weapon;
+        fish.equipWeapon(null);
+        break;
+      case EquipmentSlot.armor:
+        equipment = fish.armor;
+        fish.equipArmor(null);
+        break;
+      case EquipmentSlot.accessory:
+        equipment = fish.accessory;
+        fish.equipAccessory(null);
+        break;
+    }
+
+    if (equipment != null) {
+      state.player.inventory.add(equipment);
+      state = state.copyWith(player: state.player);
+      return true;
+    }
+
+    return false;
+  }
+
+  /// 升级装备
+  bool upgradeEquipment(String equipmentId) {
+    final equipment = state.player.inventory.firstWhere(
+      (e) => e.id == equipmentId,
+      orElse: () => throw Exception('装备不存在'),
+    );
+
+    if (state.player.coins < equipment.upgradeCost) return false;
+
+    state.player.coins -= equipment.upgradeCost;
+    final index = state.player.inventory.indexOf(equipment);
+    state.player.inventory[index] = equipment.upgrade();
+
+    state = state.copyWith(
+      player: state.player,
+      notification: '⬆️ ${equipment.name} 升级到 Lv.${equipment.level + 1}！',
+    );
+
+    return true;
+  }
+
+  /// 出售装备
+  bool sellEquipment(String equipmentId) {
+    final index = state.player.inventory.indexWhere((e) => e.id == equipmentId);
+    if (index == -1) return false;
+
+    final equipment = state.player.inventory[index];
+    final sellPrice = _calculateEquipmentSellPrice(equipment);
+
+    state.player.inventory.removeAt(index);
+    state.player.coins += sellPrice;
+
+    state = state.copyWith(
+      player: state.player,
+      notification: '💰 出售 ${equipment.emoji} ${equipment.name} 获得 $sellPrice 金币',
+    );
+
+    return true;
+  }
+
+  /// 计算装备出售价格
+  int _calculateEquipmentSellPrice(Equipment equipment) {
+    final basePrice = {
+      EquipmentRarity.common: 20,
+      EquipmentRarity.rare: 80,
+      EquipmentRarity.epic: 250,
+      EquipmentRarity.legendary: 800,
+    };
+    return (basePrice[equipment.rarity]! * equipment.level).round();
+  }
+
+  // ==================== 转生系统 ====================
+
+  /// 检查是否可以转生
+  bool canPrestige() {
+    final cost = PrestigeConfig.getPrestigeCost(state.player.prestige.level);
+    return state.player.coins >= cost && state.player.totalFishCaught >= 100;
+  }
+
+  /// 获取转生预览信息
+  PrestigePreview getPrestigePreview() {
+    final newPoints = PrestigeConfig.calculatePrestigePoints(
+      state.player.prestige.totalCoinsEarned + state.player.coins,
+    );
+    return PrestigePreview(
+      currentLevel: state.player.prestige.level,
+      newLevel: state.player.prestige.level + 1,
+      pointsGained: newPoints,
+      totalPoints: state.player.prestige.points + newPoints,
+      cost: PrestigeConfig.getPrestigeCost(state.player.prestige.level),
+    );
+  }
+
+  /// 执行转生
+  PrestigeResult doPrestige() {
+    if (!canPrestige()) {
+      return PrestigeResult(success: false, message: '条件不满足');
+    }
+
+    final preview = getPrestigePreview();
+    final newPrestigeData = PrestigeData(
+      level: preview.newLevel,
+      points: preview.totalPoints,
+      totalCoinsEarned: 0, // 重置累计金币计数
+      talentLevels: state.player.prestige.talentLevels,
+    );
+
+    // 创建新的玩家（重置大部分进度，保留转生数据）
+    final newPlayer = Player(
+      coins: 100, // 给一点初始金币
+      fishFood: 10,
+      ownedFish: [],
+      equipment: FishingEquipment(),
+      inventory: [], // 转生清空装备背包
+      lastSaveTime: DateTime.now(),
+      totalFishCaught: 0,
+      totalBossDefeated: 0,
+      prestige: newPrestigeData,
+    );
+
+    // 重置成就进度（但保留已完成的记录）
+    final newAchievementProgress = Map<String, AchievementProgress>.from(
+      state.achievementProgress.map((k, v) => MapEntry(k, v.copyWith(currentValue: 0))),
+    );
+
+    // 生成新的每日任务
+    final newDailyQuests = DailyQuestData.generate(DateTime.now());
+
+    state = state.copyWith(
+      player: newPlayer,
+      achievementProgress: newAchievementProgress,
+      dailyQuests: newDailyQuests,
+      notification: '🌟 转生成功！获得 ${preview.pointsGained} 天赋点数',
+    );
+
+    return PrestigeResult(
+      success: true,
+      message: '转生成功！等级 ${preview.currentLevel} → ${preview.newLevel}',
+      pointsGained: preview.pointsGained,
+    );
+  }
+
+  /// 升级天赋
+  bool upgradeTalent(String talentId) {
+    final talent = PrestigeTalent.allTalents.firstWhere(
+      (t) => t.id == talentId,
+      orElse: () => throw Exception('天赋不存在'),
+    );
+
+    final currentLevel = state.player.prestige.getTalentLevel(talentId);
+    if (currentLevel >= talent.maxLevel) return false;
+    if (state.player.prestige.points < talent.costPerLevel) return false;
+
+    final newTalentLevels = Map<String, int>.from(state.player.prestige.talentLevels);
+    newTalentLevels[talentId] = currentLevel + 1;
+
+    final newPrestige = state.player.prestige.copyWith(
+      points: state.player.prestige.points - talent.costPerLevel,
+      talentLevels: newTalentLevels,
+    );
+
+    // 更新玩家状态
+    state.player.prestige = newPrestige;
+    state = state.copyWith(player: state.player);
+
+    return true;
+  }
+
+  /// 获取转生加成的收入倍率
+  double getPrestigeIncomeMultiplier() {
+    return 1.0 + state.player.prestige.getTotalBonus(PrestigeBonusType.incomeBonus);
+  }
+
+  /// 获取转生加成的战斗力倍率
+  double getPrestigeBattlePowerMultiplier() {
+    return 1.0 + state.player.prestige.getTotalBonus(PrestigeBonusType.battlePower);
+  }
+
+  /// 获取转生加成的经验倍率
+  double getPrestigeExpMultiplier() {
+    return 1.0 + state.player.prestige.getTotalBonus(PrestigeBonusType.expGain);
+  }
+
   @override
   void dispose() {
     _fishingTimer?.cancel();
@@ -505,6 +807,36 @@ class FusionResult {
     required this.success,
     required this.message,
     this.newFish,
+  });
+}
+
+/// 转生预览信息
+class PrestigePreview {
+  final int currentLevel;
+  final int newLevel;
+  final int pointsGained;
+  final int totalPoints;
+  final int cost;
+
+  PrestigePreview({
+    required this.currentLevel,
+    required this.newLevel,
+    required this.pointsGained,
+    required this.totalPoints,
+    required this.cost,
+  });
+}
+
+/// 转生结果
+class PrestigeResult {
+  final bool success;
+  final String message;
+  final int? pointsGained;
+
+  PrestigeResult({
+    required this.success,
+    required this.message,
+    this.pointsGained,
   });
 }
 

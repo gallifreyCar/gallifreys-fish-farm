@@ -1,3 +1,5 @@
+import 'equipment.dart';
+
 /// 鱼的稀有度枚举
 enum Rarity {
   common,   // 普通
@@ -101,15 +103,22 @@ class Fish {
   JobType currentJob;
   double workMultiplier;
 
-  // === 战斗属性 ===
-  int hp;              // 当前生命值
-  int maxHp;           // 最大生命值
-  int attack;          // 攻击力
-  int defense;         // 防御力
-  int speed;           // 移动速度
+  // === 战斗属性（基础值） ===
+  int _baseHp;          // 基础最大生命值
+  int _baseAttack;      // 基础攻击力
+  int _baseDefense;     // 基础防御力
+  int _baseSpeed;       // 基础速度
+
+  // 当前生命值
+  int hp;
 
   // === 技能系统 ===
   final FishSkill? skill;
+
+  // === 装备系统 ===
+  Equipment? weapon;      // 武器
+  Equipment? armor;       // 护甲
+  Equipment? accessory;   // 饰品
 
   // === 场景位置 ===
   double posX;         // X坐标
@@ -117,6 +126,7 @@ class Fish {
   double targetX;      // 目标X坐标
   double targetY;      // 目标Y坐标
   FishState state;     // 当前状态
+
 
   Fish({
     required this.id,
@@ -130,11 +140,15 @@ class Fish {
     this.currentJob = JobType.idle,
     this.workMultiplier = 1.0,
     // 战斗属性默认值
-    int? hp,
-    int? maxHp,
-    int? attack,
-    int? defense,
-    int? speed,
+    int? baseHp,
+    int? baseAttack,
+    int? baseDefense,
+    int? baseSpeed,
+    int? currentHp,
+    // 装备
+    this.weapon,
+    this.armor,
+    this.accessory,
     // 技能
     FishSkill? skill,
     // 场景位置默认值
@@ -143,12 +157,70 @@ class Fish {
     this.targetX = 0,
     this.targetY = 0,
     this.state = FishState.idle,
-  })  : hp = hp ?? _calculateBaseHp(rarity, level),
-        maxHp = maxHp ?? _calculateBaseHp(rarity, level),
-        attack = attack ?? _calculateBaseAttack(rarity, level),
-        defense = defense ?? _calculateBaseDefense(rarity, level),
-        speed = speed ?? _calculateBaseSpeed(rarity),
+  })  : _baseHp = baseHp ?? _calculateBaseHp(rarity, level),
+        _baseAttack = baseAttack ?? _calculateBaseAttack(rarity, level),
+        _baseDefense = baseDefense ?? _calculateBaseDefense(rarity, level),
+        _baseSpeed = baseSpeed ?? _calculateBaseSpeed(rarity),
+        hp = currentHp ?? baseHp ?? _calculateBaseHp(rarity, level),
         skill = skill ?? FishSkill.getDefaultSkill(rarity);
+
+  // === 计算属性（基础 + 装备加成） ===
+
+  /// 最大生命值（基础 + 装备）
+  int get maxHp {
+    int bonus = 0;
+    bonus += weapon?.actualHpBonus ?? 0;
+    bonus += armor?.actualHpBonus ?? 0;
+    bonus += accessory?.actualHpBonus ?? 0;
+    return _baseHp + bonus;
+  }
+
+  /// 攻击力（基础 + 装备）
+  int get attack {
+    int bonus = 0;
+    bonus += weapon?.actualAttackBonus ?? 0;
+    bonus += armor?.actualAttackBonus ?? 0;
+    bonus += accessory?.actualAttackBonus ?? 0;
+    return _baseAttack + bonus;
+  }
+
+  /// 防御力（基础 + 装备）
+  int get defense {
+    int bonus = 0;
+    bonus += weapon?.actualDefenseBonus ?? 0;
+    bonus += armor?.actualDefenseBonus ?? 0;
+    bonus += accessory?.actualDefenseBonus ?? 0;
+    return _baseDefense + bonus;
+  }
+
+  /// 速度（基础 + 装备）
+  int get speed {
+    int bonus = 0;
+    bonus += weapon?.actualSpeedBonus ?? 0;
+    bonus += armor?.actualSpeedBonus ?? 0;
+    bonus += accessory?.actualSpeedBonus ?? 0;
+    return _baseSpeed + bonus;
+  }
+
+  /// 装备武器
+  void equipWeapon(Equipment? newWeapon) {
+    weapon = newWeapon;
+  }
+
+  /// 装备护甲
+  void equipArmor(Equipment? newArmor) {
+    armor = newArmor;
+  }
+
+  /// 装备饰品
+  void equipAccessory(Equipment? newAccessory) {
+    accessory = newAccessory;
+  }
+
+  /// 获取所有已装备的装备
+  List<Equipment> get equippedItems {
+    return [weapon, armor, accessory].whereType<Equipment>().toList();
+  }
 
   /// 计算基础生命值
   static int _calculateBaseHp(Rarity rarity, int level) {
@@ -229,12 +301,12 @@ class Fish {
     }
   }
 
-  /// 重新计算战斗属性
+  /// 重新计算战斗属性（升级时调用）
   void _recalculateCombatStats() {
-    maxHp = _calculateBaseHp(rarity, level);
-    hp = maxHp;
-    attack = _calculateBaseAttack(rarity, level);
-    defense = _calculateBaseDefense(rarity, level);
+    _baseHp = _calculateBaseHp(rarity, level);
+    _baseAttack = _calculateBaseAttack(rarity, level);
+    _baseDefense = _calculateBaseDefense(rarity, level);
+    hp = maxHp; // 恢复满血
   }
 
   /// 受到伤害
@@ -297,22 +369,24 @@ class Fish {
     'exp': exp,
     'currentJob': currentJob.index,
     'workMultiplier': workMultiplier,
+    'baseHp': _baseHp,
+    'baseAttack': _baseAttack,
+    'baseDefense': _baseDefense,
+    'baseSpeed': _baseSpeed,
     'hp': hp,
-    'maxHp': maxHp,
-    'attack': attack,
-    'defense': defense,
-    'speed': speed,
     'posX': posX,
     'posY': posY,
     'state': state.index,
     'skillType': skill?.type.index,
+    'weapon': weapon?.toJson(),
+    'armor': armor?.toJson(),
+    'accessory': accessory?.toJson(),
   };
 
   /// 从JSON创建
   factory Fish.fromJson(Map<String, dynamic> json) {
     FishSkill? skill;
     if (json['skillType'] != null) {
-      // 从保存的技能类型恢复技能
       final rarity = Rarity.values[json['rarity']];
       skill = FishSkill.getDefaultSkill(rarity);
     }
@@ -328,15 +402,17 @@ class Fish {
       exp: json['exp'] ?? 0,
       currentJob: JobType.values[json['currentJob'] ?? 0],
       workMultiplier: (json['workMultiplier'] ?? 1.0).toDouble(),
-      hp: json['hp'],
-      maxHp: json['maxHp'],
-      attack: json['attack'],
-      defense: json['defense'],
-      speed: json['speed'],
+      baseHp: json['baseHp'],
+      baseAttack: json['baseAttack'],
+      baseDefense: json['baseDefense'],
+      baseSpeed: json['baseSpeed'],
+      currentHp: json['hp'],
+      skill: skill,
       posX: (json['posX'] ?? 0).toDouble(),
       posY: (json['posY'] ?? 0).toDouble(),
       state: FishState.values[json['state'] ?? 0],
-      skill: skill,
-    );
+    )..weapon = json['weapon'] != null ? Equipment.fromJson(json['weapon']) : null
+     ..armor = json['armor'] != null ? Equipment.fromJson(json['armor']) : null
+     ..accessory = json['accessory'] != null ? Equipment.fromJson(json['accessory']) : null;
   }
 }

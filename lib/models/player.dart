@@ -1,12 +1,14 @@
 import 'fish.dart';
+import 'equipment.dart' as fish_equipment;
+import 'prestige.dart';
 
-/// 装备模型
-class Equipment {
+/// 钓鱼装备模型（鱼竿、鱼饵、鱼池）
+class FishingEquipment {
   int rodLevel;      // 鱼竿等级
   int baitLevel;     // 鱼饵等级
   int pondLevel;     // 鱼池等级
 
-  Equipment({
+  FishingEquipment({
     this.rodLevel = 1,
     this.baitLevel = 1,
     this.pondLevel = 1,
@@ -36,7 +38,7 @@ class Equipment {
     'pondLevel': pondLevel,
   };
 
-  factory Equipment.fromJson(Map<String, dynamic> json) => Equipment(
+  factory FishingEquipment.fromJson(Map<String, dynamic> json) => FishingEquipment(
     rodLevel: json['rodLevel'] ?? 1,
     baitLevel: json['baitLevel'] ?? 1,
     pondLevel: json['pondLevel'] ?? 1,
@@ -48,20 +50,28 @@ class Player {
   int coins;                  // 金币
   int fishFood;               // 鱼食
   List<Fish> ownedFish;       // 拥有的鱼
-  Equipment equipment;        // 装备
+  FishingEquipment equipment; // 钓鱼装备
+  List<fish_equipment.Equipment> inventory;  // 装备背包
   DateTime lastSaveTime;      // 上次保存时间
   int totalFishCaught;        // 总共钓到的鱼数量
+  int totalBossDefeated;      // 击败Boss总数
+  PrestigeData prestige;      // 转生数据
 
   Player({
     this.coins = 0,
     this.fishFood = 10,
     List<Fish>? ownedFish,
-    Equipment? equipment,
+    FishingEquipment? equipment,
+    List<fish_equipment.Equipment>? inventory,
     DateTime? lastSaveTime,
     this.totalFishCaught = 0,
+    this.totalBossDefeated = 0,
+    PrestigeData? prestige,
   })  : ownedFish = ownedFish ?? [],
-        equipment = equipment ?? Equipment(),
-        lastSaveTime = lastSaveTime ?? DateTime.now();
+        equipment = equipment ?? FishingEquipment(),
+        inventory = inventory ?? [],
+        lastSaveTime = lastSaveTime ?? DateTime.now(),
+        prestige = prestige ?? const PrestigeData();
 
   /// 每秒收入（所有工作中的鱼）
   int get incomePerSecond {
@@ -95,8 +105,11 @@ class Player {
     'fishFood': fishFood,
     'ownedFish': ownedFish.map((f) => f.toJson()).toList(),
     'equipment': equipment.toJson(),
+    'inventory': inventory.map((e) => e.toJson()).toList(),
     'lastSaveTime': lastSaveTime.toIso8601String(),
     'totalFishCaught': totalFishCaught,
+    'totalBossDefeated': totalBossDefeated,
+    'prestige': prestige.toJson(),
   };
 
   factory Player.fromJson(Map<String, dynamic> json) => Player(
@@ -106,11 +119,18 @@ class Player {
         ?.map((f) => Fish.fromJson(f))
         .toList() ?? [],
     equipment: json['equipment'] != null
-        ? Equipment.fromJson(json['equipment'])
-        : Equipment(),
+        ? FishingEquipment.fromJson(json['equipment'])
+        : FishingEquipment(),
+    inventory: (json['inventory'] as List?)
+        ?.map((e) => fish_equipment.Equipment.fromJson(e))
+        .toList() ?? [],
     lastSaveTime: json['lastSaveTime'] != null
         ? DateTime.parse(json['lastSaveTime'])
         : DateTime.now(),
     totalFishCaught: json['totalFishCaught'] ?? 0,
+    totalBossDefeated: json['totalBossDefeated'] ?? 0,
+    prestige: json['prestige'] != null
+        ? PrestigeData.fromJson(json['prestige'])
+        : const PrestigeData(),
   );
 }
