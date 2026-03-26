@@ -1,11 +1,11 @@
 {
-    "name": "gallifreys_fish_farm",
-    "short_name": "gallifreys_fish_farm",
+    "name": "Gallifrey's Fish Farm",
+    "short_name": "FishFarm",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "A relaxing idle fishing game - build your fish empire!",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
