@@ -8,6 +8,66 @@ enum BuildingType {
   temple,     // 神殿
 }
 
+/// 建筑协同类型
+enum SynergyType {
+  production,   // 产出加成
+  efficiency,   // 效率加成
+  quality,      // 质量加成
+}
+
+/// 建筑协同配置
+class BuildingSynergy {
+  final BuildingType sourceType;
+  final BuildingType targetType;
+  final SynergyType synergyType;
+  final double bonusPerLevel;  // 每级加成比例
+  final String description;
+
+  const BuildingSynergy({
+    required this.sourceType,
+    required this.targetType,
+    required this.synergyType,
+    required this.bonusPerLevel,
+    required this.description,
+  });
+
+  /// 预设协同关系
+  static const List<BuildingSynergy> defaultSynergies = [
+    // 码头 + 商店 = 更高的鱼售价
+    BuildingSynergy(
+      sourceType: BuildingType.dock,
+      targetType: BuildingType.shop,
+      synergyType: SynergyType.quality,
+      bonusPerLevel: 0.05,
+      description: '渔获在商店卖出更高价格',
+    ),
+    // 农田 + 码头 = 钓鱼速度提升
+    BuildingSynergy(
+      sourceType: BuildingType.farm,
+      targetType: BuildingType.dock,
+      synergyType: SynergyType.efficiency,
+      bonusPerLevel: 0.03,
+      description: '鱼食充足，钓鱼效率提升',
+    ),
+    // 矿场 + 训练场 = 训练效果提升
+    BuildingSynergy(
+      sourceType: BuildingType.mine,
+      targetType: BuildingType.training,
+      synergyType: SynergyType.efficiency,
+      bonusPerLevel: 0.08,
+      description: '矿产强化训练设施',
+    ),
+    // 神殿 + 所有建筑 = 产出加成
+    BuildingSynergy(
+      sourceType: BuildingType.temple,
+      targetType: BuildingType.shop,
+      synergyType: SynergyType.production,
+      bonusPerLevel: 0.10,
+      description: '神殿庇佑，商店收入增加',
+    ),
+  ];
+}
+
 /// 建筑数据模型
 class Building {
   final String id;
@@ -91,8 +151,8 @@ class Building {
     }
   }
 
-  /// 获取产出速度（每秒）
-  int get outputRate {
+  /// 获取产出速度（每秒）- 基础值
+  int get baseOutputRate {
     final baseRates = {
       BuildingType.dock: 0,
       BuildingType.shop: 2,
@@ -102,6 +162,50 @@ class Building {
       BuildingType.temple: 0,
     };
     return baseRates[type]! * level;
+  }
+
+  /// 计算协同加成后的产出
+  int getOutputRate(List<Building> allBuildings) {
+    var rate = baseOutputRate.toDouble();
+
+    // 应用协同加成
+    for (final synergy in BuildingSynergy.defaultSynergies) {
+      if (synergy.targetType != type) continue;
+
+      // 查找源建筑
+      final sourceBuilding = allBuildings.firstWhere(
+        (b) => b.type == synergy.sourceType && b.isUnlocked,
+        orElse: () => this,
+      );
+
+      if (sourceBuilding.isUnlocked && sourceBuilding.id != id) {
+        final bonus = synergy.bonusPerLevel * sourceBuilding.level;
+        rate *= (1 + bonus);
+      }
+    }
+
+    return rate.round();
+  }
+
+  /// 获取当前激活的协同描述列表
+  List<String> getActiveSynergies(List<Building> allBuildings) {
+    final result = <String>[];
+
+    for (final synergy in BuildingSynergy.defaultSynergies) {
+      if (synergy.targetType != type) continue;
+
+      final sourceBuilding = allBuildings.firstWhere(
+        (b) => b.type == synergy.sourceType && b.isUnlocked,
+        orElse: () => this,
+      );
+
+      if (sourceBuilding.isUnlocked && sourceBuilding.id != id) {
+        final bonus = synergy.bonusPerLevel * sourceBuilding.level;
+        result.add('${sourceBuilding.emoji} ${synergy.description} (+${(bonus * 100).toStringAsFixed(0)}%)');
+      }
+    }
+
+    return result;
   }
 
   Map<String, dynamic> toJson() => {

@@ -340,7 +340,7 @@ class WorldPainter extends CustomPainter {
   void _drawResourceAnimations(Canvas canvas, Size size) {
     // 金币飘动动画
     for (final building in buildings) {
-      if (!building.isUnlocked || building.outputRate == 0) continue;
+      if (!building.isUnlocked || building.baseOutputRate == 0) continue;
 
       // 每隔一段时间显示产出图标
       final cycleTime = (time + building.posX * 0.1) % 3;
@@ -368,10 +368,23 @@ class WorldPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(WorldPainter oldDelegate) {
-    return time != oldDelegate.time ||
-        worldFish.length != oldDelegate.worldFish.length ||
-        buildings.any((b) =>
-            oldDelegate.buildings.firstWhere((ob) => ob.id == b.id,
-                orElse: () => Building(id: '', type: BuildingType.dock, name: '', emoji: '')).isUnlocked != b.isUnlocked);
+    // 时间变化必然重绘
+    if ((time - oldDelegate.time).abs() > 0.001) return true;
+
+    // 鱼数量变化
+    if (worldFish.length != oldDelegate.worldFish.length) return true;
+
+    // 建筑解锁状态变化
+    if (buildings.length != oldDelegate.buildings.length) return true;
+
+    // 检查建筑状态（仅当时间没变时才检查，避免重复计算）
+    for (int i = 0; i < buildings.length; i++) {
+      if (buildings[i].isUnlocked != oldDelegate.buildings[i].isUnlocked ||
+          buildings[i].level != oldDelegate.buildings[i].level) {
+        return true;
+      }
+    }
+
+    return false;
   }
 }

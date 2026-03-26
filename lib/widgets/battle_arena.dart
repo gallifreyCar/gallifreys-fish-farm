@@ -34,6 +34,20 @@ class BattleArenaPainter extends CustomPainter {
   final Boss boss;
   final double time;
 
+  // 预缓存 Paint 对象，避免每帧创建
+  static final Paint _skyPaint = Paint();
+  static final Paint _starPaint = Paint()..color = const Color(0xFFFFFFFF);
+  static final Paint _groundPaint = Paint()..color = const Color(0xFF2E7D32);
+  static final Paint _grassPaint = Paint()
+    ..color = const Color(0xFF1B5E20)
+    ..strokeWidth = 2;
+  static final Paint _shadowPaint = Paint()..color = const Color(0x32000000);
+  static final Paint _bgHpPaint = Paint()..color = const Color(0xFF424242);
+  static final Paint _borderPaint = Paint()
+    ..color = const Color(0xFFFFFFFF)
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 1;
+
   BattleArenaPainter({
     required this.battleFish,
     required this.boss,
@@ -61,52 +75,43 @@ class BattleArenaPainter extends CustomPainter {
   }
 
   void _drawBackground(Canvas canvas, Size size) {
-    // 天空渐变
+    // 天空渐变 - 使用缓存
     final skyGradient = LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
-      colors: [
-        const Color(0xFF1a237e),
-        const Color(0xFF3949ab),
+      colors: const [
+        Color(0xFF1a237e),
+        Color(0xFF3949ab),
       ],
     );
-    final skyPaint = Paint()
-      ..shader = skyGradient.createShader(Rect.fromLTWH(0, 0, size.width, size.height * 0.7));
-    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height * 0.7), skyPaint);
+    _skyPaint.shader = skyGradient.createShader(Rect.fromLTWH(0, 0, size.width, size.height * 0.7));
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height * 0.7), _skyPaint);
 
-    // 星星效果
-    final starPaint = Paint()..color = Colors.white.withAlpha(150);
+    // 星星效果 - 使用缓存的 Paint
     for (int i = 0; i < 20; i++) {
       final x = (i * 47 + time * 0.5) % size.width;
       final y = (i * 31) % (size.height * 0.5);
       final twinkle = sin(time * 3 + i) * 0.5 + 0.5;
-      canvas.drawCircle(
-        Offset(x, y),
-        1 + twinkle,
-        starPaint,
-      );
+      final alpha = (150 * twinkle).round().clamp(0, 255);
+      _starPaint.color = Color(0xFFFFFFFF).withAlpha(alpha);
+      canvas.drawCircle(Offset(x, y), 1 + twinkle, _starPaint);
     }
   }
 
   void _drawGround(Canvas canvas, Size size) {
     // 地面
-    final groundPaint = Paint()..color = const Color(0xFF2E7D32);
     canvas.drawRect(
       Rect.fromLTWH(0, size.height * 0.7, size.width, size.height * 0.3),
-      groundPaint,
+      _groundPaint,
     );
 
     // 地面纹理
-    final grassPaint = Paint()
-      ..color = const Color(0xFF1B5E20)
-      ..strokeWidth = 2;
-
     for (int i = 0; i < 10; i++) {
       final x = i * size.width / 10 + sin(time + i) * 2;
       canvas.drawLine(
         Offset(x, size.height * 0.7),
         Offset(x + 5, size.height * 0.72),
-        grassPaint,
+        _grassPaint,
       );
     }
   }
@@ -116,14 +121,13 @@ class BattleArenaPainter extends CustomPainter {
     final bossY = size.height * 0.5;
 
     // Boss阴影
-    final shadowPaint = Paint()..color = Colors.black.withAlpha(50);
     canvas.drawOval(
       Rect.fromCenter(
         center: Offset(bossX, size.height * 0.75),
         width: 80,
         height: 30,
       ),
-      shadowPaint,
+      _shadowPaint,
     );
 
     // Boss抖动效果
@@ -151,10 +155,10 @@ class BattleArenaPainter extends CustomPainter {
       text: TextSpan(
         text: boss.name,
         style: const TextStyle(
-          color: Colors.white,
+          color: Color(0xFFFFFFFF),
           fontSize: 14,
           fontWeight: FontWeight.bold,
-          shadows: [Shadow(color: Colors.black, blurRadius: 2)],
+          shadows: [Shadow(color: Color(0xFF000000), blurRadius: 2)],
         ),
       ),
       textDirection: TextDirection.ltr,
@@ -170,7 +174,7 @@ class BattleArenaPainter extends CustomPainter {
       Offset(bossX - 50, bossY + 40),
       100,
       boss.hpPercent,
-      Colors.red,
+      const Color(0xFFF44336),
     );
   }
 
@@ -197,15 +201,6 @@ class BattleArenaPainter extends CustomPainter {
       scale = 1.3;
     }
 
-    // 受伤闪烁
-    Color? tint;
-    if (bf.isHurt) {
-      tint = Colors.red.withAlpha(100);
-      Future.delayed(const Duration(milliseconds: 100), () {
-        bf.isHurt = false;
-      });
-    }
-
     // 鱼图标
     final textPainter = TextPainter(
       text: TextSpan(
@@ -228,42 +223,38 @@ class BattleArenaPainter extends CustomPainter {
       Offset(bf.posX - 20, bf.posY - 30),
       40,
       bf.hpPercent,
-      Colors.green,
+      const Color(0xFF4CAF50),
     );
   }
 
   void _drawHpBar(Canvas canvas, Offset pos, double width, double percent, Color color) {
     // 背景
-    final bgPaint = Paint()..color = Colors.grey.shade800;
-    canvas.drawRect(Rect.fromLTWH(pos.dx, pos.dy, width, 6), bgPaint);
+    canvas.drawRect(Rect.fromLTWH(pos.dx, pos.dy, width, 6), _bgHpPaint);
 
-    // HP
+    // HP - 创建临时 Paint 避免颜色污染
     final hpPaint = Paint()..color = color;
     canvas.drawRect(Rect.fromLTWH(pos.dx, pos.dy, width * percent, 6), hpPaint);
 
     // 边框
-    final borderPaint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
-    canvas.drawRect(Rect.fromLTWH(pos.dx, pos.dy, width, 6), borderPaint);
+    canvas.drawRect(Rect.fromLTWH(pos.dx, pos.dy, width, 6), _borderPaint);
   }
+
+  // 缓存特效 Paint
+  static final Paint _effectPaint = Paint()
+    ..color = const Color(0x64FFEB3B)
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 3;
 
   void _drawBattleEffects(Canvas canvas, Size size) {
     // 攻击特效
     for (final bf in battleFish) {
       if (bf.isAttacking && bf.isAlive) {
         // 冲击波效果
-        final effectPaint = Paint()
-          ..color = Colors.yellow.withAlpha(100)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 3;
-
         final effectRadius = 10 + sin(time * 20) * 5;
         canvas.drawCircle(
           Offset(bf.posX + 20, bf.posY),
           effectRadius,
-          effectPaint,
+          _effectPaint,
         );
       }
     }
@@ -271,11 +262,24 @@ class BattleArenaPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(BattleArenaPainter oldDelegate) {
-    return time != oldDelegate.time ||
-        battleFish.any((bf) =>
-            oldDelegate.battleFish.firstWhere(
-              (obf) => obf.fish.id == bf.fish.id,
-              orElse: () => BattleFish(fish: bf.fish),
-            ).currentHp != bf.currentHp);
+    // 时间变化必然重绘（动画需要）
+    if ((time - oldDelegate.time).abs() > 0.001) return true;
+
+    // Boss血量变化
+    if (boss.currentHp != oldDelegate.boss.currentHp) return true;
+
+    // 战斗鱼数量变化
+    if (battleFish.length != oldDelegate.battleFish.length) return true;
+
+    // 战斗鱼状态变化（血量、攻击状态）
+    for (int i = 0; i < battleFish.length && i < oldDelegate.battleFish.length; i++) {
+      if (battleFish[i].currentHp != oldDelegate.battleFish[i].currentHp ||
+          battleFish[i].isAttacking != oldDelegate.battleFish[i].isAttacking ||
+          battleFish[i].posX != oldDelegate.battleFish[i].posX) {
+        return true;
+      }
+    }
+
+    return false;
   }
 }

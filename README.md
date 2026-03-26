@@ -47,6 +47,10 @@ flutter run -d ios
 flutter build web
 ```
 
+### 🚀 在线体验
+
+🎮 **在线游玩**: [https://gallifreycar.github.io/gallifreys-fish-farm/](https://gallifreycar.github.io/gallifreys-fish-farm/)
+
 ### 🛠️ 技术栈
 
 - **框架**: Flutter 3.x
@@ -164,6 +168,10 @@ flutter run -d ios
 # Build for Web
 flutter build web
 ```
+
+### 🚀 Play Online
+
+🎮 **Play Now**: [https://gallifreycar.github.io/gallifreys-fish-farm/](https://gallifreycar.github.io/gallifreys-fish-farm/)
 
 ### 🛠️ Tech Stack
 

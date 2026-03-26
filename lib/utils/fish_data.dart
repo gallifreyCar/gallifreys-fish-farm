@@ -1,7 +1,11 @@
+import 'dart:math';
 import '../models/fish.dart';
 
 /// 所有可钓到的鱼的配置
 class FishData {
+  // 使用单例 Random 避免重复创建
+  static final Random _random = Random();
+
   static final List<FishTemplate> allFish = [
     // 普通鱼 (70%概率)
     FishTemplate(
@@ -105,7 +109,7 @@ class FishData {
 
   /// 根据稀有度概率随机获取一条鱼
   static FishTemplate getRandomFish(double rareBonus) {
-    final random = DateTime.now().microsecondsSinceEpoch % 100;
+    final random = _random.nextInt(100);
     Rarity rarity;
 
     // 基础概率 + 加成
@@ -125,7 +129,7 @@ class FishData {
 
     // 获取该稀有度的所有鱼
     final fishOfRarity = allFish.where((f) => f.rarity == rarity).toList();
-    final index = DateTime.now().microsecondsSinceEpoch % fishOfRarity.length;
+    final index = _random.nextInt(fishOfRarity.length);
     return fishOfRarity[index];
   }
 }

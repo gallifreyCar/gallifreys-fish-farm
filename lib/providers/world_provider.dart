@@ -15,6 +15,9 @@ class WorldFish {
   double animFrame;
   double idleTime;
 
+  // 每条鱼有自己的随机数生成器，避免全局状态
+  static final Random _random = Random();
+
   WorldFish({
     required this.fish,
     this.x = 100,
@@ -34,7 +37,7 @@ class WorldFish {
       case FishState.idle:
         idleTime += dt;
         // 随机开始走动
-        if (idleTime > 2 + Random().nextDouble() * 3) {
+        if (idleTime > 2 + _random.nextDouble() * 3) {
           _pickRandomTarget(buildings);
           state = FishState.walking;
           idleTime = 0;
@@ -62,7 +65,7 @@ class WorldFish {
       case FishState.working:
         idleTime += dt;
         // 工作一段时间后可能移动
-        if (idleTime > 5 + Random().nextDouble() * 5) {
+        if (idleTime > 5 + _random.nextDouble() * 5) {
           _pickRandomTarget(buildings);
           state = FishState.walking;
           idleTime = 0;
@@ -107,14 +110,14 @@ class WorldFish {
         break;
       case JobType.idle:
         // 随机位置
-        targetX = 50 + Random().nextDouble() * 300;
-        targetY = 100 + Random().nextDouble() * 200;
+        targetX = 50 + _random.nextDouble() * 300;
+        targetY = 100 + _random.nextDouble() * 200;
         return;
     }
 
     if (targetBuilding != null) {
-      targetX = targetBuilding.posX + Random().nextDouble() * 50;
-      targetY = targetBuilding.posY + Random().nextDouble() * 50;
+      targetX = targetBuilding.posX + _random.nextDouble() * 50;
+      targetY = targetBuilding.posY + _random.nextDouble() * 50;
     }
   }
 }
@@ -150,6 +153,8 @@ class WorldState {
 
 /// 世界场景控制器
 class WorldNotifier extends StateNotifier<WorldState> {
+  static final Random _random = Random();
+
   WorldNotifier(Player player)
       : super(WorldState(
           player: player,
@@ -157,8 +162,8 @@ class WorldNotifier extends StateNotifier<WorldState> {
           worldFish: player.ownedFish
               .map((f) => WorldFish(
                     fish: f,
-                    x: 100 + Random().nextDouble() * 200,
-                    y: 150 + Random().nextDouble() * 100,
+                    x: 100 + _random.nextDouble() * 200,
+                    y: 150 + _random.nextDouble() * 100,
                   ))
               .toList(),
         ));
@@ -175,8 +180,8 @@ class WorldNotifier extends StateNotifier<WorldState> {
   void addFish(Fish fish) {
     state.worldFish.add(WorldFish(
       fish: fish,
-      x: 100 + Random().nextDouble() * 200,
-      y: 150 + Random().nextDouble() * 100,
+      x: 100 + _random.nextDouble() * 200,
+      y: 150 + _random.nextDouble() * 100,
     ));
     state = state.copyWith();
   }

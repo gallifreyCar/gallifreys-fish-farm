@@ -23,6 +23,67 @@ enum FishState {
   fighting,  // 战斗中
 }
 
+/// 鱼的技能类型
+enum SkillType {
+  criticalStrike,   // 暴击：攻击有几率造成双倍伤害
+  lifesteal,        // 吸血：攻击时恢复生命
+  shield,           // 护盾：受到伤害减少
+  counterAttack,    // 反击：被攻击时有几率反击
+  multiAttack,      // 连击：攻击有几率额外攻击
+  heal,             // 治疗：每回合恢复少量生命
+  rage,             // 狂暴：生命值低时攻击提升
+  dodge,            // 闪避：有几率闪避攻击
+}
+
+/// 鱼的技能
+class FishSkill {
+  final SkillType type;
+  final String name;
+  final String description;
+  final double chance;  // 触发概率
+  final double value;   // 效果数值
+
+  const FishSkill({
+    required this.type,
+    required this.name,
+    required this.description,
+    required this.chance,
+    required this.value,
+  });
+
+  /// 根据稀有度获取默认技能
+  static FishSkill? getDefaultSkill(Rarity rarity) {
+    switch (rarity) {
+      case Rarity.common:
+        return null; // 普通鱼无技能
+      case Rarity.rare:
+        return const FishSkill(
+          type: SkillType.criticalStrike,
+          name: '暴击',
+          description: '攻击有15%几率造成双倍伤害',
+          chance: 0.15,
+          value: 2.0,
+        );
+      case Rarity.epic:
+        return const FishSkill(
+          type: SkillType.lifesteal,
+          name: '吸血',
+          description: '攻击时恢复造成伤害的30%',
+          chance: 1.0,
+          value: 0.3,
+        );
+      case Rarity.legendary:
+        return const FishSkill(
+          type: SkillType.rage,
+          name: '狂暴',
+          description: '生命值低于50%时攻击提升50%',
+          chance: 1.0,
+          value: 0.5,
+        );
+    }
+  }
+}
+
 /// 鱼的数据模型 - 包含战斗属性和场景位置
 class Fish {
   final String id;
@@ -40,14 +101,17 @@ class Fish {
   JobType currentJob;
   double workMultiplier;
 
-  // === 新增：战斗属性 ===
+  // === 战斗属性 ===
   int hp;              // 当前生命值
   int maxHp;           // 最大生命值
   int attack;          // 攻击力
   int defense;         // 防御力
   int speed;           // 移动速度
 
-  // === 新增：场景位置 ===
+  // === 技能系统 ===
+  final FishSkill? skill;
+
+  // === 场景位置 ===
   double posX;         // X坐标
   double posY;         // Y坐标
   double targetX;      // 目标X坐标
@@ -71,6 +135,8 @@ class Fish {
     int? attack,
     int? defense,
     int? speed,
+    // 技能
+    FishSkill? skill,
     // 场景位置默认值
     this.posX = 0,
     this.posY = 0,
@@ -81,7 +147,8 @@ class Fish {
         maxHp = maxHp ?? _calculateBaseHp(rarity, level),
         attack = attack ?? _calculateBaseAttack(rarity, level),
         defense = defense ?? _calculateBaseDefense(rarity, level),
-        speed = speed ?? _calculateBaseSpeed(rarity);
+        speed = speed ?? _calculateBaseSpeed(rarity),
+        skill = skill ?? FishSkill.getDefaultSkill(rarity);
 
   /// 计算基础生命值
   static int _calculateBaseHp(Rarity rarity, int level) {
@@ -238,27 +305,38 @@ class Fish {
     'posX': posX,
     'posY': posY,
     'state': state.index,
+    'skillType': skill?.type.index,
   };
 
   /// 从JSON创建
-  factory Fish.fromJson(Map<String, dynamic> json) => Fish(
-    id: json['id'],
-    name: json['name'],
-    rarity: Rarity.values[json['rarity']],
-    emoji: json['emoji'],
-    baseIncome: json['baseIncome'],
-    baseValue: json['baseValue'],
-    level: json['level'] ?? 1,
-    exp: json['exp'] ?? 0,
-    currentJob: JobType.values[json['currentJob'] ?? 0],
-    workMultiplier: (json['workMultiplier'] ?? 1.0).toDouble(),
-    hp: json['hp'],
-    maxHp: json['maxHp'],
-    attack: json['attack'],
-    defense: json['defense'],
-    speed: json['speed'],
-    posX: (json['posX'] ?? 0).toDouble(),
-    posY: (json['posY'] ?? 0).toDouble(),
-    state: FishState.values[json['state'] ?? 0],
-  );
+  factory Fish.fromJson(Map<String, dynamic> json) {
+    FishSkill? skill;
+    if (json['skillType'] != null) {
+      // 从保存的技能类型恢复技能
+      final rarity = Rarity.values[json['rarity']];
+      skill = FishSkill.getDefaultSkill(rarity);
+    }
+
+    return Fish(
+      id: json['id'],
+      name: json['name'],
+      rarity: Rarity.values[json['rarity']],
+      emoji: json['emoji'],
+      baseIncome: json['baseIncome'],
+      baseValue: json['baseValue'],
+      level: json['level'] ?? 1,
+      exp: json['exp'] ?? 0,
+      currentJob: JobType.values[json['currentJob'] ?? 0],
+      workMultiplier: (json['workMultiplier'] ?? 1.0).toDouble(),
+      hp: json['hp'],
+      maxHp: json['maxHp'],
+      attack: json['attack'],
+      defense: json['defense'],
+      speed: json['speed'],
+      posX: (json['posX'] ?? 0).toDouble(),
+      posY: (json['posY'] ?? 0).toDouble(),
+      state: FishState.values[json['state'] ?? 0],
+      skill: skill,
+    );
+  }
 }
