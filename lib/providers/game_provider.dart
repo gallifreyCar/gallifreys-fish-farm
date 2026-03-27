@@ -165,11 +165,19 @@ class GameNotifier extends StateNotifier<GameState> {
   /// 开始钓鱼
   void _startFishing() {
     _fishingTimer?.cancel();
-    final interval = Duration(
-      seconds: (GameConstants.baseFishingIntervalSeconds / state.player.equipment.fishingSpeedBonus).round(),
-    );
-    _fishingTimer = Timer.periodic(interval, (_) {
+    _scheduleNextFishing();
+  }
+
+  /// 调度下一次钓鱼（带随机抖动）
+  void _scheduleNextFishing() {
+    final baseInterval = GameConstants.baseFishingIntervalSeconds / state.player.equipment.fishingSpeedBonus;
+    // 添加 ±30% 随机抖动
+    final jitter = baseInterval * 0.3 * (DateTime.now().millisecondsSinceEpoch % 100 / 50 - 1);
+    final actualInterval = (baseInterval + jitter).clamp(1.0, 30.0);
+
+    _fishingTimer = Timer(Duration(milliseconds: (actualInterval * 1000).round()), () {
       _catchFish();
+      _scheduleNextFishing(); // 调度下一次
     });
   }
 

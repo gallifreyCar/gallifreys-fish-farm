@@ -33,6 +33,11 @@ class _WorldScreenState extends ConsumerState<WorldScreen>
   int _lastCombo = 0;
   String? _lastBossIntro;
 
+  // 钓鱼反馈状态
+  Fish? _lastCaughtFish;
+  bool _showCaughtFish = false;
+  int _prevFishCaught = 0;
+
   @override
   void initState() {
     super.initState();
@@ -84,6 +89,29 @@ class _WorldScreenState extends ConsumerState<WorldScreen>
   /// 更新目标进度
   void _updateGoalProgress() {
     final gameState = ref.read(game.gameProvider);
+
+    // 检测是否钓到新鱼
+    if (gameState.player.totalFishCaught > _prevFishCaught) {
+      // 有新鱼上钩
+      final newFishCount = gameState.player.totalFishCaught - _prevFishCaught;
+      if (newFishCount > 0 && gameState.player.ownedFish.isNotEmpty) {
+        setState(() {
+          _lastCaughtFish = gameState.player.ownedFish.last;
+          _showCaughtFish = true;
+        });
+        // 3秒后隐藏
+        Future.delayed(const Duration(seconds: 3), () {
+          if (mounted) {
+            setState(() {
+              _showCaughtFish = false;
+            });
+          }
+        });
+        // 完成引导步骤
+        _checkTutorialStep(TutorialStep.firstFishing);
+      }
+      _prevFishCaught = gameState.player.totalFishCaught;
+    }
 
     // 更新钓鱼数量目标
     ref.read(goalProvider.notifier).updateProgress('catch_1', gameState.player.totalFishCaught);
@@ -162,9 +190,119 @@ class _WorldScreenState extends ConsumerState<WorldScreen>
           if (tutorialState.isTutorialActive &&
               tutorialState.currentStep != TutorialStep.welcome)
             _buildTutorialHint(),
+
+          // 钓鱼反馈
+          if (_showCaughtFish && _lastCaughtFish != null)
+            _buildCaughtFishDisplay(),
         ],
       ),
     );
+  }
+
+  /// 钓鱼反馈显示
+  Widget _buildCaughtFishDisplay() {
+    final fish = _lastCaughtFish!;
+    final rarityColor = _getRarityColor(fish.rarity);
+
+    return Positioned(
+      top: 100,
+      left: 20,
+      right: 20,
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0.0, end: 1.0),
+        duration: const Duration(milliseconds: 500),
+        builder: (context, value, child) {
+          return Transform.scale(
+            scale: value,
+            child: Opacity(
+              opacity: value,
+              child: child,
+            ),
+          );
+        },
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                rarityColor.withAlpha(200),
+                rarityColor.withAlpha(150),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: rarityColor.withAlpha(100),
+                blurRadius: 20,
+                spreadRadius: 2,
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(fish.emoji, style: const TextStyle(fontSize: 48)),
+              const SizedBox(width: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    fish.name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    _getRarityName(fish.rarity),
+                    style: TextStyle(
+                      color: Colors.white.withAlpha(200),
+                      fontSize: 14,
+                    ),
+                  ),
+                  Text(
+                    'Lv.${fish.level} | 战力: ${fish.power}',
+                    style: TextStyle(
+                      color: Colors.white.withAlpha(180),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Color _getRarityColor(Rarity rarity) {
+    switch (rarity) {
+      case Rarity.common:
+        return Colors.grey;
+      case Rarity.rare:
+        return Colors.blue;
+      case Rarity.epic:
+        return Colors.purple;
+      case Rarity.legendary:
+        return Colors.orange;
+    }
+  }
+
+  String _getRarityName(Rarity rarity) {
+    switch (rarity) {
+      case Rarity.common:
+        return '普通';
+      case Rarity.rare:
+        return '稀有';
+      case Rarity.epic:
+        return '史诗';
+      case Rarity.legendary:
+        return '传说';
+    }
   }
 
   Widget _buildGoalButton() {
