@@ -430,6 +430,9 @@ class _WorldScreenState extends ConsumerState<WorldScreen>
   }
 
   Widget _buildTopBar(game.GameState gameState) {
+    final fishCount = gameState.player.ownedFish.length;
+    final pondCapacity = gameState.player.equipment.pondCapacity;
+
     return SafeArea(
       child: Container(
         padding: const EdgeInsets.all(12),
@@ -441,7 +444,7 @@ class _WorldScreenState extends ConsumerState<WorldScreen>
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             _StatItem(icon: '💰', value: gameState.player.coins.toString(), label: '金币'),
-            _StatItem(icon: '🐟', value: gameState.player.ownedFish.length.toString(), label: '鱼宠'),
+            _StatItem(icon: '🐟', value: '$fishCount/$pondCapacity', label: '鱼仓'),
             _StatItem(icon: '📈', value: '${gameState.player.incomePerSecond}/秒', label: '收入'),
             _StatItem(icon: '🍖', value: gameState.player.fishFood.toString(), label: '鱼食'),
           ],
@@ -838,6 +841,10 @@ class _WorldScreenState extends ConsumerState<WorldScreen>
   }
 
   void _showFishingPanel(game.GameState gameState) {
+    final fishCount = gameState.player.ownedFish.length;
+    final pondCapacity = gameState.player.equipment.pondCapacity;
+    final isFull = fishCount >= pondCapacity;
+
     showModalBottomSheet(
       context: context,
       builder: (context) => Container(
@@ -850,6 +857,34 @@ class _WorldScreenState extends ConsumerState<WorldScreen>
               style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
+            // 鱼仓状态
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: isFull ? Colors.red.withAlpha(50) : Colors.green.withAlpha(50),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('🐟', style: const TextStyle(fontSize: 20)),
+                  const SizedBox(width: 8),
+                  Text(
+                    '鱼仓: $fishCount/$pondCapacity',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: isFull ? Colors.red : Colors.green,
+                    ),
+                  ),
+                  if (isFull) ...[
+                    const SizedBox(width: 8),
+                    const Text('⚠️ 已满', style: TextStyle(color: Colors.red)),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
             Text(
               '鱼竿等级: Lv.${gameState.player.equipment.rodLevel}',
               style: const TextStyle(fontSize: 16),
