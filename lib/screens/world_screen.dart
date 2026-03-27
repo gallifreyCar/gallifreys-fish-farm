@@ -1008,7 +1008,11 @@ class _WorldScreenState extends ConsumerState<WorldScreen>
 
     if (availableFish.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('没有可用的鱼宠！')),
+        const SnackBar(
+          content: Text('没有可用的鱼宠！请先钓一些鱼。'),
+          duration: Duration(seconds: 2),
+          backgroundColor: Colors.red,
+        ),
       );
       return;
     }
@@ -1256,8 +1260,9 @@ class _BossCard extends StatelessWidget {
     }
 
     return GestureDetector(
-      onTap: onTap,
-      child: Container(
+      onTap: isUnlocked ? onTap : null,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
         width: 140,
         margin: const EdgeInsets.only(right: 12),
         decoration: BoxDecoration(
@@ -1267,6 +1272,13 @@ class _BossCard extends StatelessWidget {
             color: boss.isDefeated ? Colors.green : (isUnlocked ? tierColor : Colors.grey),
             width: 2,
           ),
+          boxShadow: isUnlocked ? [
+            BoxShadow(
+              color: tierColor.withAlpha(80),
+              blurRadius: 8,
+              spreadRadius: 1,
+            ),
+          ] : null,
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -1278,17 +1290,22 @@ class _BossCard extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               isUnlocked ? boss.name : '???',
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: isUnlocked ? Colors.white : Colors.grey[600],
                 fontWeight: FontWeight.bold,
               ),
             ),
             Text(
-              '战力: ${boss.requiredPower}',
+              isUnlocked ? '战力: ${boss.requiredPower}' : '未解锁',
               style: TextStyle(color: Colors.grey[400], fontSize: 12),
             ),
             if (boss.isDefeated)
               const Text('✅ 已击败', style: TextStyle(color: Colors.green, fontSize: 10)),
+            if (!isUnlocked)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text('🔒', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+              ),
           ],
         ),
       ),
