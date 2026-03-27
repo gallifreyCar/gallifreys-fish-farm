@@ -570,6 +570,13 @@ class GameNotifier extends StateNotifier<GameState> {
     _autoSave();
   }
 
+  /// 重置为新游戏
+  void resetToNewGame() {
+    _fishingTimer?.cancel();
+    state = GameState(player: Player());
+    _startFishing();
+  }
+
   /// 计算离线收益
   void calculateOfflineIncome() {
     final now = DateTime.now();

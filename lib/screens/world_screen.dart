@@ -12,6 +12,7 @@ import '../services/goal_service.dart';
 import '../widgets/world_renderer.dart';
 import '../widgets/battle_arena.dart';
 import '../widgets/goal_panel.dart';
+import '../services/save_service.dart';
 import 'achievement_screen.dart';
 
 /// 主游戏场景
@@ -73,6 +74,14 @@ class _WorldScreenState extends ConsumerState<WorldScreen>
           onSkip: () {
             Navigator.pop(context);
             ref.read(tutorialProvider.notifier).skipTutorial();
+          },
+          onNewGame: () async {
+            // 清除旧存档
+            await SaveService.clear();
+            Navigator.pop(context);
+            // 重新初始化游戏状态
+            ref.read(game.gameProvider.notifier).resetToNewGame();
+            ref.read(tutorialProvider.notifier).completeStep();
           },
         ),
       );
@@ -1377,10 +1386,12 @@ class _FishCard extends StatelessWidget {
 class _WelcomeDialog extends StatefulWidget {
   final VoidCallback onStart;
   final VoidCallback onSkip;
+  final VoidCallback onNewGame;
 
   const _WelcomeDialog({
     required this.onStart,
     required this.onSkip,
+    required this.onNewGame,
   });
 
   @override
@@ -1482,6 +1493,23 @@ class _WelcomeDialogState extends State<_WelcomeDialog>
                   ),
                 ),
                 const SizedBox(height: 24),
+                // 新游戏按钮（清除旧存档）
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: widget.onNewGame,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text('🎮 新游戏', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+                const SizedBox(height: 12),
                 Row(
                   children: [
                     Expanded(
@@ -1497,7 +1525,6 @@ class _WelcomeDialogState extends State<_WelcomeDialog>
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      flex: 2,
                       child: ElevatedButton(
                         onPressed: widget.onStart,
                         style: ElevatedButton.styleFrom(
@@ -1508,7 +1535,7 @@ class _WelcomeDialogState extends State<_WelcomeDialog>
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                        child: const Text('开始冒险!', style: TextStyle(fontSize: 16)),
+                        child: const Text('继续游戏'),
                       ),
                     ),
                   ],
