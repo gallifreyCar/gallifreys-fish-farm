@@ -6,6 +6,43 @@ class FishData {
   // 使用单例 Random 避免重复创建
   static final Random _random = Random();
 
+  static FishTrait? _generateTrait(Rarity rarity) {
+    final guaranteedTrait = switch (rarity) {
+      Rarity.common => _random.nextDouble() < 0.45,
+      Rarity.rare => _random.nextDouble() < 0.65,
+      Rarity.epic => _random.nextDouble() < 0.85,
+      Rarity.legendary => true,
+    };
+
+    if (!guaranteedTrait) {
+      return null;
+    }
+
+    final traitPool = switch (rarity) {
+      Rarity.common => [
+        FishTraitType.diligent,
+        FishTraitType.lucky,
+        FishTraitType.gluttonous,
+      ],
+      Rarity.rare => [
+        FishTraitType.diligent,
+        FishTraitType.lucky,
+        FishTraitType.fierce,
+        FishTraitType.swift,
+      ],
+      Rarity.epic => [
+        FishTraitType.diligent,
+        FishTraitType.fierce,
+        FishTraitType.sturdy,
+        FishTraitType.swift,
+        FishTraitType.gluttonous,
+      ],
+      Rarity.legendary => FishTraitType.values,
+    };
+
+    return FishTrait.fromType(traitPool[_random.nextInt(traitPool.length)]);
+  }
+
   static final List<FishTemplate> allFish = [
     // ========== 普通鱼 (Common) - 45% 概率 ==========
     // 淡水鱼
@@ -125,6 +162,7 @@ class FishTemplate {
       rarity: rarity,
       baseIncome: baseIncome,
       baseValue: baseValue,
+      trait: FishData._generateTrait(rarity),
     );
   }
 }

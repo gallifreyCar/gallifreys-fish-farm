@@ -102,6 +102,32 @@ class Player {
     return fish.baseValue * fish.level;
   }
 
+  Player copyWith({
+    int? coins,
+    int? fishFood,
+    List<Fish>? ownedFish,
+    FishingEquipment? equipment,
+    List<fish_equipment.Equipment>? inventory,
+    DateTime? lastSaveTime,
+    int? totalFishCaught,
+    int? totalBossDefeated,
+    PrestigeData? prestige,
+    Map<String, dynamic>? achievementProgress,
+  }) {
+    return Player(
+      coins: coins ?? this.coins,
+      fishFood: fishFood ?? this.fishFood,
+      ownedFish: ownedFish ?? this.ownedFish,
+      equipment: equipment ?? this.equipment,
+      inventory: inventory ?? this.inventory,
+      lastSaveTime: lastSaveTime ?? this.lastSaveTime,
+      totalFishCaught: totalFishCaught ?? this.totalFishCaught,
+      totalBossDefeated: totalBossDefeated ?? this.totalBossDefeated,
+      prestige: prestige ?? this.prestige,
+      achievementProgress: achievementProgress ?? this.achievementProgress,
+    );
+  }
+
   Map<String, dynamic> toJson() => {
     'coins': coins,
     'fishFood': fishFood,

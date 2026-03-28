@@ -151,6 +151,22 @@ class EventManager {
       ));
     }
 
+    // 傍晚潮汐时段 (18:00-20:00)
+    final tideStart = DateTime(now.year, now.month, now.day, 18, 0);
+    final tideEnd = DateTime(now.year, now.month, now.day, 20, 0);
+    if (now.isBefore(tideEnd)) {
+      events.add(GameEvent(
+        id: 'tide_rare_${now.millisecondsSinceEpoch}',
+        name: '潮汐鱼群',
+        description: '稀有鱼和史诗鱼出现概率提升！',
+        emoji: '🌊',
+        type: EventType.rareFishBoost,
+        multiplier: 1.8,
+        startTime: tideStart,
+        endTime: tideEnd,
+      ));
+    }
+
     // 晚间Boss战 (20:00-23:00)
     final eveningStart = DateTime(now.year, now.month, now.day, 20, 0);
     final eveningEnd = DateTime(now.year, now.month, now.day, 23, 0);

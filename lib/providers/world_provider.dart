@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/fish.dart';
 import '../models/building.dart';
 import '../models/player.dart';
+import 'game_provider.dart' as game;
 
 /// 场景中的鱼实体
 class WorldFish {
@@ -115,10 +116,8 @@ class WorldFish {
         return;
     }
 
-    if (targetBuilding != null) {
-      targetX = targetBuilding.posX + _random.nextDouble() * 50;
-      targetY = targetBuilding.posY + _random.nextDouble() * 50;
-    }
+    targetX = targetBuilding.posX + _random.nextDouble() * 50;
+    targetY = targetBuilding.posY + _random.nextDouble() * 50;
   }
 }
 
@@ -154,19 +153,61 @@ class WorldState {
 /// 世界场景控制器
 class WorldNotifier extends StateNotifier<WorldState> {
   static final Random _random = Random();
+  final Ref _ref;
 
-  WorldNotifier(Player player)
+  WorldNotifier(this._ref, Player player)
       : super(WorldState(
           player: player,
           buildings: Building.defaultBuildings,
           worldFish: player.ownedFish
-              .map((f) => WorldFish(
-                    fish: f,
-                    x: 100 + _random.nextDouble() * 200,
-                    y: 150 + _random.nextDouble() * 100,
-                  ))
+              .map(_createWorldFish)
               .toList(),
         ));
+
+  static WorldFish _createWorldFish(Fish fish) {
+    final spawnX = fish.posX == 0 ? 100 + _random.nextDouble() * 200 : fish.posX;
+    final spawnY = fish.posY == 0 ? 150 + _random.nextDouble() * 100 : fish.posY;
+    final targetX = fish.targetX == 0 ? spawnX : fish.targetX;
+    final targetY = fish.targetY == 0 ? spawnY : fish.targetY;
+
+    return WorldFish(
+      fish: fish,
+      x: spawnX,
+      y: spawnY,
+      targetX: targetX,
+      targetY: targetY,
+      state: fish.state,
+    );
+  }
+
+  void syncPlayer(Player player) {
+    final existingById = {
+      for (final wf in state.worldFish) wf.fish.id: wf,
+    };
+
+    final syncedWorldFish = player.ownedFish.map((fish) {
+      final existing = existingById[fish.id];
+      if (existing == null) {
+        return _createWorldFish(fish);
+      }
+
+      return WorldFish(
+        fish: fish,
+        x: existing.x,
+        y: existing.y,
+        targetX: existing.targetX,
+        targetY: existing.targetY,
+        state: existing.state == FishState.fighting ? FishState.idle : existing.state,
+        animFrame: existing.animFrame,
+        idleTime: existing.idleTime,
+      );
+    }).toList();
+
+    state = state.copyWith(
+      player: player,
+      worldFish: syncedWorldFish,
+    );
+  }
 
   /// 更新场景
   void update(double dt) {
@@ -178,11 +219,7 @@ class WorldNotifier extends StateNotifier<WorldState> {
 
   /// 添加鱼
   void addFish(Fish fish) {
-    state.worldFish.add(WorldFish(
-      fish: fish,
-      x: 100 + _random.nextDouble() * 200,
-      y: 150 + _random.nextDouble() * 100,
-    ));
+    state.worldFish.add(_createWorldFish(fish));
     state = state.copyWith();
   }
 
@@ -190,11 +227,14 @@ class WorldNotifier extends StateNotifier<WorldState> {
   bool unlockBuilding(String buildingId) {
     final building = state.buildings.firstWhere((b) => b.id == buildingId);
     if (building.isUnlocked) return false;
-    if (state.player.coins < building.unlockCost) return false;
+    if (!_ref.read(game.gameProvider.notifier).trySpendCoins(building.unlockCost)) {
+      return false;
+    }
 
-    state.player.coins -= building.unlockCost;
     building.isUnlocked = true;
-    state = state.copyWith();
+    state = state.copyWith(
+      player: _ref.read(game.gameProvider).player,
+    );
     return true;
   }
 
@@ -202,29 +242,38 @@ class WorldNotifier extends StateNotifier<WorldState> {
   bool upgradeBuilding(String buildingId) {
     final building = state.buildings.firstWhere((b) => b.id == buildingId);
     if (!building.isUnlocked) return false;
-    if (state.player.coins < building.upgradeCost) return false;
+    if (!_ref.read(game.gameProvider.notifier).trySpendCoins(building.upgradeCost)) {
+      return false;
+    }
 
-    state.player.coins -= building.upgradeCost;
     building.level++;
-    state = state.copyWith();
+    state = state.copyWith(
+      player: _ref.read(game.gameProvider).player,
+    );
     return true;
   }
 
   /// 指派鱼的工作
   void assignJob(String fishId, JobType job) {
-    final fish = state.player.ownedFish.firstWhere((f) => f.id == fishId);
-    if (fish == null) return;
-
-    fish.currentJob = job;
-    final worldFish = state.worldFish.firstWhere((wf) => wf.fish.id == fishId);
-    if (worldFish != null) {
-      worldFish.state = FishState.walking;
+    _ref.read(game.gameProvider.notifier).assignJob(fishId, job);
+    for (final worldFish in state.worldFish) {
+      if (worldFish.fish.id == fishId) {
+        worldFish.state = FishState.walking;
+        break;
+      }
     }
-    state = state.copyWith();
+    state = state.copyWith(
+      player: _ref.read(game.gameProvider).player,
+    );
   }
 }
 
 /// 世界场景Provider
 final worldProvider = StateNotifierProvider<WorldNotifier, WorldState>((ref) {
-  return WorldNotifier(Player());
+  final notifier = WorldNotifier(ref, ref.read(game.gameProvider).player);
+  ref.listen<Player>(
+    game.gameProvider.select((state) => state.player),
+    (_, next) => notifier.syncPlayer(next),
+  );
+  return notifier;
 });

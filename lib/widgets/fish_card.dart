@@ -19,6 +19,7 @@ class FishCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final rarityColor = Color(GameConstants.rarityColors[fish.rarity]!);
     final rarityName = GameConstants.rarityNames[fish.rarity]!;
+    final trait = fish.trait;
 
     return Card(
       elevation: 2,
@@ -72,6 +73,24 @@ class FishCard extends StatelessWidget {
                         color: Colors.grey[600],
                       ),
                     ),
+                    if (trait != null) ...[
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: rarityColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          '${trait.emoji} ${trait.name}',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: rarityColor,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

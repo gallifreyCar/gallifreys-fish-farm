@@ -191,14 +191,13 @@ class GameNotifier extends StateNotifier<GameState> {
       return;
     }
 
-    final template = FishData.getRandomFish(state.player.equipment.rareFishBonus);
+    final eventRareBonus = (EventManager.getRareFishMultiplier(state.activeEvents) - 1.0) * 0.1;
+    final totalRareBonus = (state.player.equipment.rareFishBonus + eventRareBonus).clamp(0.0, 0.25);
+    final template = FishData.getRandomFish(totalRareBonus);
     final fish = template.createFish();
 
-    final newPlayer = Player(
-      coins: state.player.coins,
-      fishFood: state.player.fishFood,
+    final newPlayer = state.player.copyWith(
       ownedFish: [...state.player.ownedFish, fish],
-      equipment: state.player.equipment,
       lastSaveTime: DateTime.now(),
       totalFishCaught: state.player.totalFishCaught + 1,
     );
@@ -224,7 +223,9 @@ class GameNotifier extends StateNotifier<GameState> {
     state = state.copyWith(
       player: newPlayer,
       lastCaughtFish: fish,
-      notification: '钓到了 ${fish.emoji} ${fish.name}！',
+      notification: state.activeEvents.any((event) => event.type == EventType.rareFishBoost)
+          ? '潮汐加持！钓到了 ${fish.emoji} ${fish.name}！'
+          : '钓到了 ${fish.emoji} ${fish.name}！',
       achievementProgress: newProgress,
       dailyQuests: newDailyQuests,
     );
@@ -303,13 +304,9 @@ class GameNotifier extends StateNotifier<GameState> {
     final achievement = Achievement.allAchievements.firstWhere((a) => a.id == achievementId);
 
     // 发放奖励
-    final newPlayer = Player(
+    final newPlayer = state.player.copyWith(
       coins: state.player.coins + achievement.rewardCoins,
       fishFood: state.player.fishFood + achievement.rewardFishFood,
-      ownedFish: state.player.ownedFish,
-      equipment: state.player.equipment,
-      lastSaveTime: state.player.lastSaveTime,
-      totalFishCaught: state.player.totalFishCaught,
     );
 
     // 标记已领取
@@ -354,13 +351,9 @@ class GameNotifier extends StateNotifier<GameState> {
     final quest = dailyQuests.quests.firstWhere((q) => q.id == questId);
 
     // 发放奖励
-    final newPlayer = Player(
+    final newPlayer = state.player.copyWith(
       coins: state.player.coins + quest.rewardCoins,
       fishFood: state.player.fishFood + quest.rewardFishFood,
-      ownedFish: state.player.ownedFish,
-      equipment: state.player.equipment,
-      lastSaveTime: state.player.lastSaveTime,
-      totalFishCaught: state.player.totalFishCaught,
     );
 
     // 标记已领取
@@ -420,13 +413,9 @@ class GameNotifier extends StateNotifier<GameState> {
     newOwnedFish.add(newFish);
 
     // 更新玩家数据
-    final newPlayer = Player(
-      coins: state.player.coins,
-      fishFood: state.player.fishFood,
+    final newPlayer = state.player.copyWith(
       ownedFish: newOwnedFish,
-      equipment: state.player.equipment,
       lastSaveTime: DateTime.now(),
-      totalFishCaught: state.player.totalFishCaught,
     );
 
     // 更新收集成就
@@ -448,19 +437,30 @@ class GameNotifier extends StateNotifier<GameState> {
 
   /// 收集收入
   void _collectIncome() {
-    final income = state.player.incomePerSecond;
+    final income = (state.player.incomePerSecond * state.eventIncomeMultiplier).round();
     if (income <= 0) return;
 
     state = state.copyWith(
-      player: Player(
+      player: state.player.copyWith(
         coins: state.player.coins + income,
-        fishFood: state.player.fishFood,
-        ownedFish: state.player.ownedFish,
-        equipment: state.player.equipment,
         lastSaveTime: DateTime.now(),
-        totalFishCaught: state.player.totalFishCaught,
       ),
     );
+  }
+
+  /// 扣除金币
+  bool trySpendCoins(int amount) {
+    if (amount <= 0) return true;
+    if (state.player.coins < amount) return false;
+
+    state = state.copyWith(
+      player: state.player.copyWith(
+        coins: state.player.coins - amount,
+        lastSaveTime: DateTime.now(),
+      ),
+    );
+
+    return true;
   }
 
   /// 切换钓鱼状态
@@ -585,13 +585,15 @@ class GameNotifier extends StateNotifier<GameState> {
     final maxOfflineSeconds = GameConstants.offlineIncomeCapHours * 3600;
 
     final effectiveSeconds = offlineSeconds.clamp(0, maxOfflineSeconds);
-    final offlineIncome = state.player.incomePerSecond * effectiveSeconds;
+    final offlineIncome = (state.player.incomePerSecond * state.eventIncomeMultiplier).round() * effectiveSeconds;
 
     if (offlineIncome > 0) {
       state.player.coins += offlineIncome;
       state = state.copyWith(
         player: state.player,
-        notification: '离线收益：$offlineIncome 金币',
+        notification: state.eventIncomeMultiplier > 1.0
+            ? '活动加成生效！离线收益：$offlineIncome 金币'
+            : '离线收益：$offlineIncome 金币',
       );
     }
   }

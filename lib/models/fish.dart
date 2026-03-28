@@ -37,6 +37,98 @@ enum SkillType {
   dodge,            // 闪避：有几率闪避攻击
 }
 
+/// 鱼词条类型
+enum FishTraitType {
+  diligent,   // 勤奋
+  lucky,      // 幸运
+  fierce,     // 凶猛
+  sturdy,     // 坚韧
+  swift,      // 迅捷
+  gluttonous, // 贪吃
+}
+
+/// 鱼词条
+class FishTrait {
+  final FishTraitType type;
+  final String name;
+  final String emoji;
+  final String description;
+  final double incomeMultiplier;
+  final double attackMultiplier;
+  final double defenseMultiplier;
+  final double speedMultiplier;
+  final double expMultiplier;
+
+  const FishTrait({
+    required this.type,
+    required this.name,
+    required this.emoji,
+    required this.description,
+    this.incomeMultiplier = 1.0,
+    this.attackMultiplier = 1.0,
+    this.defenseMultiplier = 1.0,
+    this.speedMultiplier = 1.0,
+    this.expMultiplier = 1.0,
+  });
+
+  static const Map<FishTraitType, FishTrait> presets = {
+    FishTraitType.diligent: FishTrait(
+      type: FishTraitType.diligent,
+      name: '勤奋',
+      emoji: '💼',
+      description: '工作收益更高',
+      incomeMultiplier: 1.2,
+    ),
+    FishTraitType.lucky: FishTrait(
+      type: FishTraitType.lucky,
+      name: '幸运',
+      emoji: '🍀',
+      description: '更容易在活动中钓到好货',
+      incomeMultiplier: 1.1,
+      expMultiplier: 1.1,
+    ),
+    FishTraitType.fierce: FishTrait(
+      type: FishTraitType.fierce,
+      name: '凶猛',
+      emoji: '🦷',
+      description: '攻击力更高',
+      attackMultiplier: 1.18,
+    ),
+    FishTraitType.sturdy: FishTrait(
+      type: FishTraitType.sturdy,
+      name: '坚韧',
+      emoji: '🛡️',
+      description: '防御力更高',
+      defenseMultiplier: 1.18,
+    ),
+    FishTraitType.swift: FishTrait(
+      type: FishTraitType.swift,
+      name: '迅捷',
+      emoji: '💨',
+      description: '速度更快',
+      speedMultiplier: 1.2,
+    ),
+    FishTraitType.gluttonous: FishTrait(
+      type: FishTraitType.gluttonous,
+      name: '贪吃',
+      emoji: '🍖',
+      description: '吃得多，成长也更快',
+      incomeMultiplier: 1.08,
+      expMultiplier: 1.2,
+    ),
+  };
+
+  factory FishTrait.fromType(FishTraitType type) => presets[type]!;
+
+  Map<String, dynamic> toJson() => {
+    'type': type.index,
+  };
+
+  factory FishTrait.fromJson(Map<String, dynamic> json) {
+    return FishTrait.fromType(FishTraitType.values[json['type']]);
+  }
+}
+
 /// 鱼的技能
 class FishSkill {
   final SkillType type;
@@ -114,6 +206,7 @@ class Fish {
 
   // === 技能系统 ===
   final FishSkill? skill;
+  final FishTrait? trait;
 
   // === 装备系统 ===
   Equipment? weapon;      // 武器
@@ -151,6 +244,7 @@ class Fish {
     this.accessory,
     // 技能
     FishSkill? skill,
+    this.trait,
     // 场景位置默认值
     this.posX = 0,
     this.posY = 0,
@@ -181,7 +275,7 @@ class Fish {
     bonus += weapon?.actualAttackBonus ?? 0;
     bonus += armor?.actualAttackBonus ?? 0;
     bonus += accessory?.actualAttackBonus ?? 0;
-    return _baseAttack + bonus;
+    return ((_baseAttack + bonus) * (trait?.attackMultiplier ?? 1.0)).round();
   }
 
   /// 防御力（基础 + 装备）
@@ -190,7 +284,7 @@ class Fish {
     bonus += weapon?.actualDefenseBonus ?? 0;
     bonus += armor?.actualDefenseBonus ?? 0;
     bonus += accessory?.actualDefenseBonus ?? 0;
-    return _baseDefense + bonus;
+    return ((_baseDefense + bonus) * (trait?.defenseMultiplier ?? 1.0)).round();
   }
 
   /// 速度（基础 + 装备）
@@ -199,7 +293,7 @@ class Fish {
     bonus += weapon?.actualSpeedBonus ?? 0;
     bonus += armor?.actualSpeedBonus ?? 0;
     bonus += accessory?.actualSpeedBonus ?? 0;
-    return _baseSpeed + bonus;
+    return ((_baseSpeed + bonus) * (trait?.speedMultiplier ?? 1.0)).round();
   }
 
   /// 装备武器
@@ -269,7 +363,7 @@ class Fish {
   int get power => hp + attack * 3 + defense * 2 + speed;
 
   /// 获取当前收入（考虑等级和工作加成）
-  int get income => (baseIncome * level * workMultiplier * _jobBonus).round();
+  int get income => (baseIncome * level * workMultiplier * _jobBonus * (trait?.incomeMultiplier ?? 1.0)).round();
 
   /// 工作加成
   double get _jobBonus {
@@ -292,7 +386,7 @@ class Fish {
 
   /// 添加经验并升级
   void addExp(int amount) {
-    exp += amount;
+    exp += (amount * (trait?.expMultiplier ?? 1.0)).round();
     while (exp >= expToNextLevel) {
       exp -= expToNextLevel;
       level++;
@@ -378,6 +472,7 @@ class Fish {
     'posY': posY,
     'state': state.index,
     'skillType': skill?.type.index,
+    'trait': trait?.toJson(),
     'weapon': weapon?.toJson(),
     'armor': armor?.toJson(),
     'accessory': accessory?.toJson(),
@@ -408,6 +503,7 @@ class Fish {
       baseSpeed: json['baseSpeed'],
       currentHp: json['hp'],
       skill: skill,
+      trait: json['trait'] != null ? FishTrait.fromJson(json['trait']) : null,
       posX: (json['posX'] ?? 0).toDouble(),
       posY: (json['posY'] ?? 0).toDouble(),
       state: FishState.values[json['state'] ?? 0],

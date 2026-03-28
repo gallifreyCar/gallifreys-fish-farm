@@ -180,6 +180,14 @@ class _WorldScreenState extends ConsumerState<WorldScreen>
             child: _buildTopBar(gameState),
           ),
 
+          if (gameState.activeEvents.isNotEmpty)
+            Positioned(
+              top: 72,
+              left: 12,
+              right: 12,
+              child: _buildEventBanner(gameState),
+            ),
+
           // 底部操作栏
           Positioned(
             bottom: 0,
@@ -212,6 +220,7 @@ class _WorldScreenState extends ConsumerState<WorldScreen>
   Widget _buildCaughtFishDisplay() {
     final fish = _lastCaughtFish!;
     final rarityColor = _getRarityColor(fish.rarity);
+    final trait = fish.trait;
 
     return Positioned(
       top: 100,
@@ -279,6 +288,25 @@ class _WorldScreenState extends ConsumerState<WorldScreen>
                       fontSize: 12,
                     ),
                   ),
+                  if (trait != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withAlpha(35),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          '${trait.emoji} ${trait.name} · ${trait.description}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ],
@@ -480,7 +508,7 @@ class _WorldScreenState extends ConsumerState<WorldScreen>
               label: '钓鱼',
               featureId: 'fishing',
               onTap: () {
-                _showFishingPanel(gameState);
+                _showFishingPanel();
                 _checkTutorialStep(TutorialStep.firstFishing);
               },
             ),
@@ -489,7 +517,7 @@ class _WorldScreenState extends ConsumerState<WorldScreen>
               label: '战斗',
               featureId: 'battle',
               onTap: () {
-                _showBattlePanel(gameState);
+                _showBattlePanel();
                 _checkTutorialStep(TutorialStep.firstBattle);
               },
             ),
@@ -525,6 +553,54 @@ class _WorldScreenState extends ConsumerState<WorldScreen>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildEventBanner(game.GameState gameState) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: gameState.activeEvents.map((event) {
+          return Container(
+            margin: const EdgeInsets.only(right: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.black.withAlpha(170),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: Colors.orange.withAlpha(160),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(event.emoji, style: const TextStyle(fontSize: 16)),
+                const SizedBox(width: 6),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      event.name,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      event.remainingTimeDescription,
+                      style: TextStyle(
+                        color: Colors.white.withAlpha(180),
+                        fontSize: 10,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        }).toList(),
       ),
     );
   }
@@ -849,118 +925,133 @@ class _WorldScreenState extends ConsumerState<WorldScreen>
     );
   }
 
-  void _showFishingPanel(game.GameState gameState) {
-    final fishCount = gameState.player.ownedFish.length;
-    final pondCapacity = gameState.player.equipment.pondCapacity;
-    final isFull = fishCount >= pondCapacity;
-
+  void _showFishingPanel() {
     showModalBottomSheet(
       context: context,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              gameState.isFishing ? '🎣 钓鱼中...' : '⏸️ 已暂停',
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            // 鱼仓状态
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: isFull ? Colors.red.withAlpha(50) : Colors.green.withAlpha(50),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('🐟', style: const TextStyle(fontSize: 20)),
-                  const SizedBox(width: 8),
-                  Text(
-                    '鱼仓: $fishCount/$pondCapacity',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: isFull ? Colors.red : Colors.green,
-                    ),
+      builder: (context) => Consumer(
+        builder: (context, ref, _) {
+          final liveGameState = ref.watch(game.gameProvider);
+          final fishCount = liveGameState.player.ownedFish.length;
+          final pondCapacity = liveGameState.player.equipment.pondCapacity;
+          final isFull = fishCount >= pondCapacity;
+
+          return Container(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  liveGameState.isFishing ? '🎣 钓鱼中...' : '⏸️ 已暂停',
+                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isFull ? Colors.red.withAlpha(50) : Colors.green.withAlpha(50),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  if (isFull) ...[
-                    const SizedBox(width: 8),
-                    const Text('⚠️ 已满', style: TextStyle(color: Colors.red)),
-                  ],
-                ],
-              ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('🐟', style: TextStyle(fontSize: 20)),
+                      const SizedBox(width: 8),
+                      Text(
+                        '鱼仓: $fishCount/$pondCapacity',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: isFull ? Colors.red : Colors.green,
+                        ),
+                      ),
+                      if (isFull) ...[
+                        const SizedBox(width: 8),
+                        const Text('⚠️ 已满', style: TextStyle(color: Colors.red)),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  '鱼竿等级: Lv.${liveGameState.player.equipment.rodLevel}',
+                  style: const TextStyle(fontSize: 16),
+                ),
+                Text(
+                  '钓鱼速度: ${(1 / liveGameState.player.equipment.fishingSpeedBonus).toStringAsFixed(1)}秒/次',
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () {
+                    ref.read(game.gameProvider.notifier).toggleFishing();
+                    Navigator.pop(context);
+                  },
+                  child: Text(liveGameState.isFishing ? '暂停钓鱼' : '开始钓鱼'),
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
-            Text(
-              '鱼竿等级: Lv.${gameState.player.equipment.rodLevel}',
-              style: const TextStyle(fontSize: 16),
-            ),
-            Text(
-              '钓鱼速度: ${(1 / gameState.player.equipment.fishingSpeedBonus).toStringAsFixed(1)}秒/次',
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () {
-                ref.read(game.gameProvider.notifier).toggleFishing();
-                Navigator.pop(context);
-              },
-              child: Text(gameState.isFishing ? '暂停钓鱼' : '开始钓鱼'),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 
-  void _showBattlePanel(game.GameState gameState) {
-    final bosses = Boss.defaultBosses;
-    final availableFish = gameState.player.ownedFish;
-
+  void _showBattlePanel() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        maxChildSize: 0.9,
-        minChildSize: 0.5,
-        expand: false,
-        builder: (context, scrollController) => Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.grey[900],
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                '⚔️ Boss 战斗',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '总战力: ${availableFish.fold<int>(0, (sum, f) => sum + f.power)}',
-                style: TextStyle(color: Colors.grey[400]),
-              ),
-              const SizedBox(height: 16),
+      builder: (context) => Consumer(
+        builder: (context, ref, _) {
+          final liveGameState = ref.watch(game.gameProvider);
+          final bosses = Boss.defaultBosses;
+          final availableFish = liveGameState.player.ownedFish;
 
-              // Boss列表 - 按难度分组
-              Expanded(
-                child: ListView(
-                  controller: scrollController,
-                  children: [
-                    _buildBossTier('初级 Boss', bosses.where((b) => b.tier == BossTier.easy).toList(), availableFish),
-                    _buildBossTier('中级 Boss', bosses.where((b) => b.tier == BossTier.medium).toList(), availableFish),
-                    _buildBossTier('高级 Boss', bosses.where((b) => b.tier == BossTier.hard).toList(), availableFish),
-                  ],
-                ),
+          return DraggableScrollableSheet(
+            initialChildSize: 0.7,
+            maxChildSize: 0.9,
+            minChildSize: 0.5,
+            expand: false,
+            builder: (context, scrollController) => Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey[900],
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
               ),
-            ],
-          ),
-        ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '⚔️ Boss 战斗',
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '出战鱼宠: ${availableFish.length} · 总战力: ${availableFish.fold<int>(0, (sum, f) => sum + f.power)}',
+                    style: TextStyle(color: Colors.grey[400]),
+                  ),
+                  if (availableFish.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        '先钓到至少 1 条鱼才能出战。',
+                        style: TextStyle(color: Colors.orange[300], fontSize: 13),
+                      ),
+                    ),
+                  const SizedBox(height: 16),
+                  Expanded(
+                    child: ListView(
+                      controller: scrollController,
+                      children: [
+                        _buildBossTier('初级 Boss', bosses.where((b) => b.tier == BossTier.easy).toList(), availableFish),
+                        _buildBossTier('中级 Boss', bosses.where((b) => b.tier == BossTier.medium).toList(), availableFish),
+                        _buildBossTier('高级 Boss', bosses.where((b) => b.tier == BossTier.hard).toList(), availableFish),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -1259,11 +1350,10 @@ class _BossCard extends StatelessWidget {
         break;
     }
 
-    return GestureDetector(
-      onTap: isUnlocked ? onTap : null,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        width: 140,
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        width: 172,
         margin: const EdgeInsets.only(right: 12),
         decoration: BoxDecoration(
           color: isUnlocked ? Colors.grey[800] : Colors.grey[900],
@@ -1272,41 +1362,69 @@ class _BossCard extends StatelessWidget {
             color: boss.isDefeated ? Colors.green : (isUnlocked ? tierColor : Colors.grey),
             width: 2,
           ),
-          boxShadow: isUnlocked ? [
-            BoxShadow(
-              color: tierColor.withAlpha(80),
-              blurRadius: 8,
-              spreadRadius: 1,
-            ),
-          ] : null,
+          boxShadow: isUnlocked
+              ? [
+                  BoxShadow(
+                    color: tierColor.withAlpha(80),
+                    blurRadius: 8,
+                    spreadRadius: 1,
+                  ),
+                ]
+              : null,
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              isUnlocked ? boss.emoji : '❓',
-              style: const TextStyle(fontSize: 36),
+        child: InkWell(
+          onTap: isUnlocked ? onTap : null,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  isUnlocked ? boss.emoji : 'BOSS',
+                  style: const TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  isUnlocked ? boss.name : '未解锁 Boss',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: isUnlocked ? Colors.white : Colors.grey[600],
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  isUnlocked ? '推荐战力 ${boss.requiredPower}' : '需先击败前置 Boss',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                ),
+                if (boss.isDefeated)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 4),
+                    child: Text('✅ 已击败', style: TextStyle(color: Colors.green, fontSize: 10)),
+                  ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: isUnlocked ? onTap : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: boss.isDefeated ? Colors.green : tierColor,
+                      disabledBackgroundColor: Colors.grey[700],
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                    ),
+                    child: Text(
+                      boss.isDefeated ? '再次挑战' : (isUnlocked ? '挑战' : '未解锁'),
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              isUnlocked ? boss.name : '???',
-              style: TextStyle(
-                color: isUnlocked ? Colors.white : Colors.grey[600],
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            Text(
-              isUnlocked ? '战力: ${boss.requiredPower}' : '未解锁',
-              style: TextStyle(color: Colors.grey[400], fontSize: 12),
-            ),
-            if (boss.isDefeated)
-              const Text('✅ 已击败', style: TextStyle(color: Colors.green, fontSize: 10)),
-            if (!isUnlocked)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text('🔒', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-              ),
-          ],
+          ),
         ),
       ),
     );

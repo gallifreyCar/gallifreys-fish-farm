@@ -84,6 +84,7 @@ class _FishListItem extends StatelessWidget {
     final rarityName = GameConstants.rarityNames[fish.rarity]!;
     final jobName = GameConstants.jobNames[fish.currentJob]!;
     final jobEmoji = GameConstants.jobEmojis[fish.currentJob]!;
+    final trait = fish.trait;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -171,6 +172,27 @@ class _FishListItem extends StatelessWidget {
                       ),
                     ],
                   ),
+                  if (trait != null) ...[
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: rarityColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        '${trait.emoji} ${trait.name} · ${trait.description}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: rarityColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 4),
                   Text(
                     '💰 ${fish.income}/秒',
